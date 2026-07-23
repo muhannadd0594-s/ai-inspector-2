@@ -91,8 +91,12 @@ def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
         }],
         "temperature": 0.2,
     }
+    
+    # حيلة لفصل الرابط حتى لا يتلفه المحرر
+    ai_url = "https://" + "openrouter.ai/api/v1/chat/completions"
+    
     resp = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
+        ai_url,
         json=payload,
         headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"},
         timeout=45,
@@ -167,8 +171,11 @@ def format_report_html(result: dict) -> str:
 # إرسال الرد عبر Resend API
 # -------------------------------------------------------------
 def send_reply(to_address: str, subject: str, html_body: str):
+    # حيلة لفصل الرابط
+    send_url = "https://" + "[api.resend.com/emails](https://api.resend.com/emails)"
+    
     requests.post(
-        "[https://api.resend.com/emails](https://api.resend.com/emails)",
+        send_url,
         json={
             "from": f"AI Product Inspector <{FROM_ADDRESS}>",
             "to": [to_address],
@@ -194,8 +201,10 @@ def webhook():
         
         if email_id and RESEND_API_KEY:
             headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
-            # استخدام دمج النصوص المباشر لتجنب أي مشاكل في الروابط
-            api_url = "[https://api.resend.com/emails/](https://api.resend.com/emails/)" + email_id
+            
+            # 💡 الحل العبقري: فصلنا الرابط لنمنع المحرر من إضافة أقواس وتخريبه
+            api_url = "https://" + "[api.resend.com/emails/](https://api.resend.com/emails/)" + str(email_id)
+            
             resp = requests.get(api_url, headers=headers, timeout=15)
             if resp.status_code == 200:
                 email_data = resp.json()
