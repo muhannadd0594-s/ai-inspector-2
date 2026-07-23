@@ -186,31 +186,41 @@ def send_reply(to_address: str, subject: str, html_body: str):
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        data = request.json or {}
+        # قراءة البيانات بشرط قراءة صحيحة يمنع رمي 400 تلقائي
+        payload = request.get_json(force=True, silent=True) or {}
+        
+        # استخراج البيانات الأساسية سواء كانت داخل data أو مباشرة في الجذر
+        email_data = payload.get("data", payload)
         
         # استخراج بريد المرسل
-        raw_from = data.get("from", "")
-        _, sender = email.utils.parseaddr(raw_from)
+        raw_from = email_data.get("from", "")
+        if isinstance(raw_from, list) and len(raw_from) > 0:
+            raw_from = raw_from[0]
+            
+        _, sender = email.utils.parseaddr(str(raw_from))
         if not sender:
-            sender = raw_from
+            sender = str(raw_from)
 
-        subject = data.get("subject", "")
-        caption = data.get("text", "") or data.get("html", "")
-        attachments = data.get("attachments", [])
+        subject = email_data.get("subject", "")
+        caption = email_data.get("text", "") or email_data.get("html", "")
+        attachments = email_data.get("attachments", [])
         
         image_bytes = None
-        if attachments:
+        if attachments and isinstance(attachments, list):
             att = attachments[0]
-            if "content" in att:
+            if isinstance(att, dict) and "content" in att:
                 image_bytes = base64.b64decode(att["content"])
 
-        if image_bytes:
+        if image_bytes and sender:
+            log.info(f"Processing email from: {sender} with subject: {subject}")
             result = analyze_image(image_bytes, caption, subject)
             report_html = format_report_html(result)
             send_reply(sender, subject, report_html)
             return jsonify({"status": "success", "message": "Analyzed and replied"}), 200
         
-        return jsonify({"status": "error", "message": "No image found in email attachments"}), 400
+        # إرجاع 200 دائماً لطلبات الاختبار أو الرسائل بدون مرفقات لمنع إرجاع خطأ 400 لـ Svix
+        log.info("Received webhook ping or message without valid image attachment.")
+        return jsonify({"status": "ignored", "message": "No valid image found or test ping received"}), 200
         
     except Exception as e:
         log.exception("Webhook processing error")
