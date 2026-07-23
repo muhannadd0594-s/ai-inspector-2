@@ -187,19 +187,18 @@ def send_reply(to_address: str, subject: str, html_body: str):
 def webhook():
     try:
         payload = request.get_json(force=True, silent=True) or {}
-        log.info(f"RAW PAYLOAD RECEIVED: {json.dumps(payload)}")
-        
         email_data = payload.get("data", payload)
         
-        # استخراج معرف الإيميل لجلب تفاصيله الكاملة والمرفقات من Resend API
+        # استخراج معرف الإيميل
         email_id = email_data.get("id") or email_data.get("email_id")
         
         if email_id and RESEND_API_KEY:
             headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
-            resp = requests.get(f"[https://api.resend.com/emails/](https://api.resend.com/emails/){email_id}", headers=headers, timeout=15)
+            # استخدام دمج النصوص المباشر لتجنب أي مشاكل في الروابط
+            api_url = "[https://api.resend.com/emails/](https://api.resend.com/emails/)" + email_id
+            resp = requests.get(api_url, headers=headers, timeout=15)
             if resp.status_code == 200:
                 email_data = resp.json()
-                log.info(f"EMAIL DATA FROM RESEND API: {json.dumps(email_data)}")
         
         # استخراج بريد المرسل
         raw_from = email_data.get("from", "")
@@ -213,8 +212,6 @@ def webhook():
         subject = email_data.get("subject", "")
         caption = email_data.get("text", "") or email_data.get("html", "")
         attachments = email_data.get("attachments", [])
-        
-        log.info(f"EXTRACTED ATTACHMENTS: {attachments}")
         
         image_bytes = None
         if attachments and isinstance(attachments, list):
