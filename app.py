@@ -40,18 +40,28 @@ def compress_image(image_bytes: bytes, max_size=(800, 800)) -> bytes:
 # -------------------------------------------------------------
 def get_dynamic_prompt(subject: str, caption: str) -> str:
     combined_text = f"{subject} {caption}".lower()
-    base_prompt = """You are an expert AI Product Quality Inspector.
-Analyze the provided product image and caption/description.
-Return ONLY a JSON object with this structure:
+    
+    base_prompt = """You are a world-class AI Product Quality Inspector and Forensic E-commerce Authenticator. Analyze the provided product image and the seller's caption with extreme precision.
+
+Return ONLY a valid JSON object strictly matching this structure, with absolutely NO extra text, markdown formatting, or English words in the text fields:
 {
   "image_quality": "good|poor|unusable",
-  "quality_note": "reason if poor/unusable",
+  "quality_note": "سبب دقيق باللغة العربية حصراً إذا كانت الصورة سيئة أو غير صالحة، أو اتركها فارغة",
   "observations": [
-    {"type": "damage|discrepancy|inconsistency|note", "description": "Arabic text"}
+    {
+      "type": "damage|discrepancy|inconsistency|note",
+      "description": "صف العيب أو الملاحظة بمهنية ودقة تامة باللغة العربية حصراً"
+    }
   ],
   "seller_claim_check": "matches|contradicts|cannot_confirm",
-  "summary_for_user": "Short Arabic summary of the overall item status"
-}"""
+  "summary_for_user": "ملخص تنفيذي من 2-3 جمل باللغة العربية حصراً، موجه للمشتري مباشرة، يبدأ بـ 'المنتج يبدو...' أو 'نلاحظ...'، يذكر أبرز نقطة إيجابية وأبرز نقطة سلبية إن وجدت، وينتهي بتوصية واضحة"
+}
+
+CRITICAL RULES:
+1. EVERY text value inside the JSON MUST be strictly in Arabic language only. NO English words allowed in values.
+2. The fields "description", "quality_note", and "summary_for_user" must be 100% Arabic.
+3. Respond ONLY with the raw JSON object, nothing else.
+4. If no issues are found, still provide 1-2 positive observations (type: "note") about the product's condition."""
 
     if any(word in combined_text for word in ["جوال", "الكترونيات", "ايفون", "لابتوب", "شاشة", "ايباد", "phone", "electronics"]):
         category_focus = "\n\nCategory Focus (Electronics & Phones): Strictly inspect for screen scratches, damaged corners, camera lens cleanliness, and back glass cracks or defects."
