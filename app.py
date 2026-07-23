@@ -186,11 +186,17 @@ def send_reply(to_address: str, subject: str, html_body: str):
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        # قراءة البيانات بشرط قراءة صحيحة يمنع رمي 400 تلقائي
         payload = request.get_json(force=True, silent=True) or {}
-        
-        # استخراج البيانات الأساسية سواء كانت داخل data أو مباشرة في الجذر
         email_data = payload.get("data", payload)
+        
+        # استخراج معرف الإيميل لجلب تفاصيله الكاملة والمرفقات من Resend API
+        email_id = email_data.get("id") or email_data.get("email_id")
+        
+        if email_id and RESEND_API_KEY:
+            headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
+            resp = requests.get(f"[https://api.resend.com/emails/](https://api.resend.com/emails/){email_id}", headers=headers, timeout=15)
+            if resp.status_code == 200:
+                email_data = resp.json()
         
         # استخراج بريد المرسل
         raw_from = email_data.get("from", "")
@@ -207,9 +213,19 @@ def webhook():
         
         image_bytes = None
         if attachments and isinstance(attachments, list):
-            att = attachments[0]
-            if isinstance(att, dict) and "content" in att:
-                image_bytes = base64.b64decode(att["content"])
+            for att in attachments:
+                if isinstance(att, dict):
+                    if "content" in att:
+                        try:
+                            image_bytes = base64.b64decode(att["content"])
+                            break
+                        except Exception:
+                            pass
+                    elif "url" in att:
+                        img_resp = requests.get(att["url"], timeout=15)
+                        if img_resp.status_code == 200:
+                            image_bytes = img_resp.content
+                            break
 
         if image_bytes and sender:
             log.info(f"Processing email from: {sender} with subject: {subject}")
@@ -218,9 +234,8 @@ def webhook():
             send_reply(sender, subject, report_html)
             return jsonify({"status": "success", "message": "Analyzed and replied"}), 200
         
-        # إرجاع 200 دائماً لطلبات الاختبار أو الرسائل بدون مرفقات لمنع إرجاع خطأ 400 لـ Svix
-        log.info("Received webhook ping or message without valid image attachment.")
-        return jsonify({"status": "ignored", "message": "No valid image found or test ping received"}), 200
+        log.info("Received webhook but no valid image attachment found.")
+        return jsonify({"status": "ignored", "message": "No valid image found"}), 200
         
     except Exception as e:
         log.exception("Webhook processing error")
