@@ -9,7 +9,6 @@ from dotenv import load_dotenv
 import io
 from PIL import Image
 
-# تحميل المتغيرات
 load_dotenv()
 
 app = Flask(__name__)
@@ -79,7 +78,7 @@ def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
     compressed_bytes = compress_image(image_bytes)
     b64 = base64.b64encode(compressed_bytes).decode()
     final_prompt = get_dynamic_prompt(subject, caption)
-    
+
     payload = {
         "model": "google/gemini-2.5-flash",
         "messages": [{
@@ -91,12 +90,8 @@ def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
         }],
         "temperature": 0.2,
     }
-    
-    domain = "".join([chr(111), chr(112), chr(101), chr(110), chr(114), chr(111), chr(117), chr(116), chr(101), chr(114), chr(46), chr(97), chr(105)])
-    ai_url = f"https://{domain}/api/v1/chat/completions"
-    
     resp = requests.post(
-        ai_url,
+        "https://openrouter.ai/api/v1/chat/completions",
         json=payload,
         headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"},
         timeout=45,
@@ -107,6 +102,7 @@ def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
     try:
         return json.loads(clean)
     except json.JSONDecodeError:
+        log.error("Failed to parse model response: %s", raw)
         return {
             "image_quality": "unusable",
             "observations": [],
@@ -120,7 +116,7 @@ def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
 def format_report_html(result: dict) -> str:
     status_color = "#27ae60"
     status_text = "يبدو المنتج في حالة جيدة"
-    
+
     if result.get("image_quality") in ("poor", "unusable"):
         return f"""
         <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px; background-color: #fce4e4; color: #cc0000; border-radius: 8px;">
@@ -128,7 +124,7 @@ def format_report_html(result: dict) -> str:
             <p>{result.get('quality_note', 'نعتذر، لم نتمكن من فحص المنتج بوضوح.')}</p>
         </div>
         """
-        
+
     if result.get("seller_claim_check") == "contradicts":
         status_color = "#e74c3c"
         status_text = "⚠️ تنبيه: يوجد تعارض محتمل مع وصف البائع!"
@@ -140,7 +136,7 @@ def format_report_html(result: dict) -> str:
     icons = {"damage": "❌ [تلف]", "discrepancy": "⚠️ [تعارض]", "inconsistency": "🔍 [ملاحظة]", "note": "💡 [معلومة]"}
     for o in result.get("observations", []):
         obs_html += f"<li style='margin-bottom: 10px;'><strong>{icons.get(o['type'], '📌')}</strong> {o['description']}</li>"
-    
+
     if not obs_html:
         obs_html = "<li>لم يلاحظ النظام أي مشاكل ظاهرة على المنتج.</li>"
 
@@ -168,14 +164,11 @@ def format_report_html(result: dict) -> str:
     """
 
 # -------------------------------------------------------------
-# إرسال الرد عبر Resend API
+# إرسال الرد عبر Resend API (تم إصلاح الرابط الخاطئ هنا)
 # -------------------------------------------------------------
 def send_reply(to_address: str, subject: str, html_body: str):
-    resend_host = "".join([chr(114), chr(101), chr(115), chr(101), chr(110), chr(100), chr(46), chr(99), chr(111), chr(109)])
-    send_url = f"https://api.{resend_host}/emails"
-    
-    requests.post(
-        send_url,
+    resp = requests.post(
+        "https://api.resend.com/emails",
         json={
             "from": f"AI Product Inspector <{FROM_ADDRESS}>",
             "to": [to_address],
@@ -185,6 +178,7 @@ def send_reply(to_address: str, subject: str, html_body: str):
         headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
         timeout=20,
     )
+    resp.raise_for_status()
     log.info("Reply sent successfully to %s", to_address)
 
 # -------------------------------------------------------------
@@ -193,66 +187,75 @@ def send_reply(to_address: str, subject: str, html_body: str):
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        payload = request.get_json(force=True, silent=True) or {}
-        email_data = payload.get("data", payload)
-        
-        email_id = email_data.get("id") or email_data.get("email_id")
-        
-        if email_id and RESEND_API_KEY:
-            headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
-            r_host = "".join([chr(114), chr(101), chr(115), chr(101), chr(110), chr(100), chr(46), chr(99), chr(111), chr(109)])
-            
-            # جلب تفاصيل الإيميل
-            api_url = f"https://api.{r_host}/emails/{email_id}"
-            resp = requests.get(api_url, headers=headers, timeout=15)
-            if resp.status_code == 200:
-                email_data = resp.json()
-                log.info(f"FETCHED EMAIL DATA: {json.dumps(email_data)}")
+        event = request.get_json(force=True, silent=True) or {}
+        data = event.get("data", event)
 
-        # استخراج بريد المرسل
-        raw_from = email_data.get("from", "")
-        if isinstance(raw_from, list) and len(raw_from) > 0:
+        # Resend's webhook payload nests the real email id under "email_id"
+        email_id = data.get("email_id") or data.get("id")
+
+        raw_from = data.get("from", "")
+        if isinstance(raw_from, list) and raw_from:
             raw_from = raw_from[0]
-            
         _, sender = email.utils.parseaddr(str(raw_from))
         if not sender:
             sender = str(raw_from)
 
-        subject = email_data.get("subject", "")
-        caption = email_data.get("text", "") or email_data.get("html", "")
-        attachments = email_data.get("attachments", [])
-        
-        log.info(f"FOUND ATTACHMENTS DATA: {json.dumps(attachments)}")
-        
+        subject = data.get("subject", "")
+        attachments_meta = data.get("attachments", [])
+
         image_bytes = None
-        if attachments and isinstance(attachments, list):
-            for att in attachments:
-                if isinstance(att, dict):
-                    # تجربة استخراج الصور بمختلف المفاتيح المحتملة من Resend
-                    if "content" in att and att["content"]:
-                        try:
-                            image_bytes = base64.b64decode(att["content"])
-                            break
-                        except Exception:
-                            pass
-                    
-                    url_to_fetch = att.get("url") or att.get("download_url")
-                    if not image_bytes and url_to_fetch:
-                        img_resp = requests.get(url_to_fetch, timeout=15)
-                        if img_resp.status_code == 200:
-                            image_bytes = img_resp.content
-                            break
+        caption = ""
+
+        if email_id and RESEND_API_KEY:
+            headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
+
+            # Step 1: fetch the email body (webhooks only carry metadata, not content)
+            body_resp = requests.get(
+                f"https://api.resend.com/emails/receiving/{email_id}",
+                headers=headers, timeout=15,
+            )
+            if body_resp.status_code == 200:
+                body_data = body_resp.json()
+                caption = body_data.get("text") or body_data.get("html") or ""
+            else:
+                log.warning("Could not fetch email body: %s %s", body_resp.status_code, body_resp.text)
+
+            # Step 2: for each image attachment, get its signed download_url, then fetch the bytes
+            for att in attachments_meta:
+                att_id = att.get("id")
+                content_type = att.get("content_type", "")
+                if not att_id or not content_type.startswith("image/"):
+                    continue
+
+                att_resp = requests.get(
+                    f"https://api.resend.com/emails/receiving/{email_id}/attachments/{att_id}",
+                    headers=headers, timeout=15,
+                )
+                if att_resp.status_code != 200:
+                    log.warning("Could not fetch attachment metadata: %s %s", att_resp.status_code, att_resp.text)
+                    continue
+
+                download_url = att_resp.json().get("download_url")
+                if not download_url:
+                    continue
+
+                file_resp = requests.get(download_url, timeout=20)
+                if file_resp.status_code == 200:
+                    image_bytes = file_resp.content
+                    break
+                else:
+                    log.warning("Could not download attachment file: %s", file_resp.status_code)
 
         if image_bytes and sender:
-            log.info(f"Processing email from: {sender} with subject: {subject}")
+            log.info("Processing email from: %s subject: %s", sender, subject)
             result = analyze_image(image_bytes, caption, subject)
             report_html = format_report_html(result)
             send_reply(sender, subject, report_html)
             return jsonify({"status": "success", "message": "Analyzed and replied"}), 200
-        
-        log.info("Received webhook but no valid image attachment found.")
+
+        log.info("No valid image attachment retrieved for email_id=%s", email_id)
         return jsonify({"status": "ignored", "message": "No valid image found"}), 200
-        
+
     except Exception as e:
         log.exception("Webhook processing error")
         return jsonify({"status": "error", "message": str(e)}), 500
