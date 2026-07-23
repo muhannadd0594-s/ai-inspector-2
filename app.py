@@ -194,7 +194,7 @@ def webhook():
         
         if email_id and RESEND_API_KEY:
             headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
-           resp = requests.get(f"https://api.resend.com/emails/{email_id}", headers=headers, timeout=15)
+            resp = requests.get(f"[https://api.resend.com/emails/](https://api.resend.com/emails/){email_id}", headers=headers, timeout=15)
             if resp.status_code == 200:
                 email_data = resp.json()
         
