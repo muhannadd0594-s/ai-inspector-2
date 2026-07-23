@@ -92,8 +92,9 @@ def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
         "temperature": 0.2,
     }
     
-    # حيلة لفصل الرابط حتى لا يتلفه المحرر
-    ai_url = "https://" + "openrouter.ai/api/v1/chat/completions"
+    # تحويل الرابط إلى مصفوفة حروف خالية تماماً من الماركدون
+    domain = "".join([chr(111), chr(112), chr(101), chr(110), chr(114), chr(111), chr(117), chr(116), chr(101), chr(114), chr(46), chr(97), chr(105)])
+    ai_url = f"https://{domain}/api/v1/chat/completions"
     
     resp = requests.post(
         ai_url,
@@ -171,8 +172,9 @@ def format_report_html(result: dict) -> str:
 # إرسال الرد عبر Resend API
 # -------------------------------------------------------------
 def send_reply(to_address: str, subject: str, html_body: str):
-    # حيلة لفصل الرابط
-    send_url = "https://" + "[api.resend.com/emails](https://api.resend.com/emails)"
+    # استخدام مصفوفة أرقام الحروف لمنع المحرر من عمل link ماركدون
+    resend_host = "".join([chr(114), chr(101), chr(115), chr(101), chr(110), chr(100), chr(46), chr(99), chr(111), chr(109)])
+    send_url = f"https://api.{resend_host}/emails"
     
     requests.post(
         send_url,
@@ -196,14 +198,14 @@ def webhook():
         payload = request.get_json(force=True, silent=True) or {}
         email_data = payload.get("data", payload)
         
-        # استخراج معرف الإيميل
         email_id = email_data.get("id") or email_data.get("email_id")
         
         if email_id and RESEND_API_KEY:
             headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
             
-            # 💡 الحل العبقري: فصلنا الرابط لنمنع المحرر من إضافة أقواس وتخريبه
-            api_url = "https://" + "[api.resend.com/emails/](https://api.resend.com/emails/)" + str(email_id)
+            # بناء اسم النطاق حرّاً بحرف تلو الآخر لتجنب الماركدون تماماً
+            r_host = "".join([chr(114), chr(101), chr(115), chr(101), chr(110), chr(100), chr(46), chr(99), chr(111), chr(109)])
+            api_url = f"https://api.{r_host}/emails/{email_id}"
             
             resp = requests.get(api_url, headers=headers, timeout=15)
             if resp.status_code == 200:
