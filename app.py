@@ -89,8 +89,8 @@ def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
     b64 = base64.b64encode(compressed_bytes).decode()
     final_prompt = get_dynamic_prompt(subject, caption)
 
-    payload = {
-        "model": "google/gemini-2.5-flash",
+  payload = {
+        "model": "anthropic/claude-3.5-sonnet",
         "messages": [{
             "role": "user",
             "content": [
