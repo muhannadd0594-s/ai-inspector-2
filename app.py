@@ -3,7 +3,7 @@ import json
 import base64
 import logging
 import email.utils
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 import requests
 from dotenv import load_dotenv
 import io
@@ -178,7 +178,7 @@ def format_report_html(result: dict) -> str:
 # -------------------------------------------------------------
 def send_reply(to_address: str, subject: str, html_body: str):
     resp = requests.post(
-        "https://api.resend.com/emails",
+        "[https://api.resend.com/emails](https://api.resend.com/emails)",
         json={
             "from": f"AI Product Inspector <{FROM_ADDRESS}>",
             "to": [to_address],
@@ -190,6 +190,13 @@ def send_reply(to_address: str, subject: str, html_body: str):
     )
     resp.raise_for_status()
     log.info("Reply sent successfully to %s", to_address)
+
+# -------------------------------------------------------------
+# الصفحة الرئيسية (تمت إضافة عرض واجهة الموقع هنا)
+# -------------------------------------------------------------
+@app.route("/", methods=["GET"])
+def home():
+    return render_template("index.html")
 
 # -------------------------------------------------------------
 # نقطة استقبال الإشعار من السحاب (Webhook)
@@ -221,7 +228,7 @@ def webhook():
 
             # Step 1: fetch the email body (webhooks only carry metadata, not content)
             body_resp = requests.get(
-                f"https://api.resend.com/emails/receiving/{email_id}",
+                f"[https://api.resend.com/emails/receiving/](https://api.resend.com/emails/receiving/){email_id}",
                 headers=headers, timeout=15,
             )
             if body_resp.status_code == 200:
@@ -238,7 +245,7 @@ def webhook():
                     continue
 
                 att_resp = requests.get(
-                    f"https://api.resend.com/emails/receiving/{email_id}/attachments/{att_id}",
+                    f"[https://api.resend.com/emails/receiving/](https://api.resend.com/emails/receiving/){email_id}/attachments/{att_id}",
                     headers=headers, timeout=15,
                 )
                 if att_resp.status_code != 200:
@@ -269,10 +276,6 @@ def webhook():
     except Exception as e:
         log.exception("Webhook processing error")
         return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route("/", methods=["GET"])
-def health():
-    return "AI Inspector Bot is running 24/7!", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
