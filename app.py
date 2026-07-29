@@ -82,14 +82,14 @@ CRITICAL RULES:
     return base_prompt + category_focus + user_text
 
 # -------------------------------------------------------------
-# تحليل الصورة عبر الذكاء الاصطناعي
+# تحليل الصورة عبر الذكاء الاصطناعي (تم التحديث لـ Claude 3.5 Sonnet)
 # -------------------------------------------------------------
 def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
     compressed_bytes = compress_image(image_bytes)
     b64 = base64.b64encode(compressed_bytes).decode()
     final_prompt = get_dynamic_prompt(subject, caption)
 
-  payload = {
+    payload = {
         "model": "anthropic/claude-3.5-sonnet",
         "messages": [{
             "role": "user",
@@ -121,7 +121,7 @@ def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
         }
 
 # -------------------------------------------------------------
-# تنسيق تقرير HTML باللغة العربية
+# تنسيق تقرير HTML باللغة العربية (مع إخلاء المسؤولية)
 # -------------------------------------------------------------
 def format_report_html(result: dict) -> str:
     status_color = "#27ae60"
@@ -167,6 +167,11 @@ def format_report_html(result: dict) -> str:
                 <p style="color: #34495e; line-height: 1.6; font-size: 16px;">{result.get('summary_for_user', 'لا توجد خلاصة متاحة.')}</p>
                 <h3 style="color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; margin-top: 25px;">التفاصيل والملاحظات:</h3>
                 <ul style="color: #34495e; line-height: 1.6; font-size: 15px; padding-right: 20px;">{obs_html}</ul>
+                
+                <!-- إخلاء المسؤولية القانونية -->
+                <div style="margin-top: 35px; padding-top: 15px; border-top: 1px dashed #bdc3c7; text-align: center; font-size: 11px; color: #7f8c8d; line-height: 1.6;">
+                    <strong>⚠️ إخلاء مسؤولية:</strong> هذا التقرير هو أداة استشارية مبنية على التحليل الآلي للصور، ولا يغني عن الفحص الفني أو الميكانيكي على أرض الواقع. الخدمة لا تتحمل أي مسؤولية قانونية أو مالية عن قرارات الشراء أو البيع، أو عن حالة المنتج الفعلية.
+                </div>
             </div>
         </div>
     </body>
@@ -174,7 +179,7 @@ def format_report_html(result: dict) -> str:
     """
 
 # -------------------------------------------------------------
-# إرسال الرد عبر Resend API (تم إصلاح الرابط الخاطئ هنا)
+# إرسال الرد عبر Resend API
 # -------------------------------------------------------------
 def send_reply(to_address: str, subject: str, html_body: str):
     resp = requests.post(
@@ -192,7 +197,7 @@ def send_reply(to_address: str, subject: str, html_body: str):
     log.info("Reply sent successfully to %s", to_address)
 
 # -------------------------------------------------------------
-# الصفحة الرئيسية (تمت إضافة عرض واجهة الموقع هنا)
+# الصفحة الرئيسية
 # -------------------------------------------------------------
 @app.route("/", methods=["GET"])
 def home():
@@ -207,7 +212,6 @@ def webhook():
         event = request.get_json(force=True, silent=True) or {}
         data = event.get("data", event)
 
-        # Resend's webhook payload nests the real email id under "email_id"
         email_id = data.get("email_id") or data.get("id")
 
         raw_from = data.get("from", "")
@@ -226,7 +230,6 @@ def webhook():
         if email_id and RESEND_API_KEY:
             headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
 
-            # Step 1: fetch the email body (webhooks only carry metadata, not content)
             body_resp = requests.get(
                 f"[https://api.resend.com/emails/receiving/](https://api.resend.com/emails/receiving/){email_id}",
                 headers=headers, timeout=15,
@@ -237,7 +240,6 @@ def webhook():
             else:
                 log.warning("Could not fetch email body: %s %s", body_resp.status_code, body_resp.text)
 
-            # Step 2: for each image attachment, get its signed download_url, then fetch the bytes
             for att in attachments_meta:
                 att_id = att.get("id")
                 content_type = att.get("content_type", "")
