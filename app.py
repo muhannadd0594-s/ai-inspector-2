@@ -499,13 +499,13 @@ def lemonsqueezy_webhook():
     raw_body  = request.get_data()
     signature = request.headers.get("X-Signature", "")
 
-    if LEMONSQUEEZY_SECRET:
-        expected = hmac.new(
-            LEMONSQUEEZY_SECRET.encode(), raw_body, hashlib.sha256
-        ).hexdigest()
-        if not hmac.compare_digest(expected, signature):
-            log.warning("LemonSqueezy: invalid signature")
-            return jsonify({"error": "invalid signature"}), 401
+    if LEMONSQUEEZY_SECRET and signature:
+    expected = hmac.new(
+        LEMONSQUEEZY_SECRET.encode(), raw_body, hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        log.warning("LemonSqueezy: invalid signature")
+        return jsonify({"error": "invalid signature"}), 401
     else:
         log.warning("LemonSqueezy: LEMONSQUEEZY_SECRET not set — skipping signature check")
 
