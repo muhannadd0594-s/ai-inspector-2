@@ -673,191 +673,180 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ════════════════════════════════════════════
-   PDF GENERATOR
-   Pure JS — no external libs needed.
-   Uses jsPDF loaded from CDN on demand.
+   PDF GENERATOR — Print-to-PDF method
+   Uses browser's native print dialog which
+   handles Arabic/RTL perfectly on all devices.
+   Works on Desktop, iOS Safari, Android Chrome.
 ════════════════════════════════════════════ */
 function downloadPDF() {
   if (!window._lastReportHtml) { alert('لا يوجد تقرير لتحميله بعد.'); return; }
 
-  /* Load jsPDF lazily */
-  if (!window.jspdf) {
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    s.onload = () => _buildPDF();
-    document.head.appendChild(s);
-  } else {
-    _buildPDF();
-  }
-}
-
-function _buildPDF() {
-  const { jsPDF } = window.jspdf;
-  const doc  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W    = doc.internal.pageSize.getWidth();   // 210
-  const H    = doc.internal.pageSize.getHeight();  // 297
   const b64  = document.getElementById('logo-b64-store').textContent.trim();
+  const logo = 'data:image/png;base64,' + b64;
   const desc = window._lastDesc || 'تقرير فحص المنتج';
-  const date = new Date().toLocaleDateString('ar-SA', {year:'numeric',month:'long',day:'numeric'});
-
-  /* ── Dark header bar ── */
-  doc.setFillColor(15, 23, 42);          // slate-950
-  doc.rect(0, 0, W, 40, 'F');
-
-  /* Logo top-right */
-  try { doc.addImage('data:image/png;base64,' + b64, 'PNG', W-22, 6, 16, 16); } catch(e) {}
-
-  /* Title (right-aligned) */
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(52, 211, 153);       // emerald-400
-  doc.text('AI Inspector', W-40, 17, { align: 'right' });
-
-  doc.setFontSize(9);
-  doc.setTextColor(148, 163, 184);      // slate-400
-  doc.text('editchecker.com', W-40, 23, { align: 'right' });
-
-  /* Subtitle left side */
-  doc.setFontSize(11);
-  doc.setTextColor(248, 250, 252);
-  doc.text('Product Inspection Report', 14, 17);
-  doc.setFontSize(8);
-  doc.setTextColor(148, 163, 184);
-  doc.text(date, 14, 23);
-
-  /* ── Info band ── */
-  doc.setFillColor(30, 41, 59);          // slate-800
-  doc.rect(0, 40, W, 14, 'F');
-  doc.setFontSize(9);
-  doc.setTextColor(203, 213, 225);
-  doc.text('المنتج / الوصف:', W-14, 49, { align: 'right' });
-  doc.setTextColor(52, 211, 153);
-  // Truncate long descs
-  const shortDesc = desc.length > 60 ? desc.substring(0, 60) + '...' : desc;
-  doc.text(shortDesc, W-52, 49, { align: 'right' });
-
-  /* ── Parse the report HTML to extract text content ── */
-  const tmp  = document.createElement('div');
-  tmp.innerHTML = window._lastReportHtml;
-
-  /* Extract sections */
-  const verdictTitle = tmp.querySelector('h3')?.textContent?.trim() || '';
-  const scoreEl      = tmp.querySelector('[style*="22px"]');
-  const score        = scoreEl?.textContent?.trim() || '';
-  const summaryEl    = [...tmp.querySelectorAll('div')].find(d => d.textContent.includes('التوصية') || d.textContent.includes('توصية'));
-  const summary      = summaryEl?.nextElementSibling?.textContent?.trim() || tmp.querySelector('p')?.textContent?.trim() || '';
-
-  let y = 62;
-
-  /* ── Verdict box ── */
-  doc.setFillColor(26, 35, 50);
-  doc.roundedRect(10, y, W-20, 20, 3, 3, 'F');
-  doc.setFontSize(12);
-  doc.setTextColor(52, 211, 153);
-  doc.text(verdictTitle || 'نتيجة الفحص', W-14, y+8, { align: 'right' });
-  doc.setFontSize(18);
-  doc.setTextColor(248, 250, 252);
-  doc.text(score, 28, y+13, { align: 'center' });
-  doc.setFontSize(8);
-  doc.setTextColor(148, 163, 184);
-  doc.text('التقييم العام', 28, y+18, { align: 'center' });
-  y += 26;
-
-  /* ── Metrics bars ── */
-  const metricDivs = [...tmp.querySelectorAll('div')].filter(d => {
-    const txt = d.textContent.trim();
-    return txt.match(/\d+%/) && txt.length < 60;
+  const date = new Date().toLocaleDateString('ar-SA', {
+    year: 'numeric', month: 'long', day: 'numeric'
   });
 
-  if (metricDivs.length) {
-    doc.setFontSize(9);
-    doc.setTextColor(248, 250, 252);
-    doc.text('مؤشرات الجودة', W-14, y+5, { align: 'right' });
-    y += 10;
+  /* ── Strip the dark-theme inline styles from the report
+        and re-skin it for white print background ── */
+  const tmp = document.createElement('div');
+  tmp.innerHTML = window._lastReportHtml;
 
-    metricDivs.slice(0, 5).forEach(md => {
-      const match = md.textContent.match(/(\d+)%/);
-      const pct   = match ? parseInt(match[1]) : 70;
-      const label = md.textContent.replace(/\d+%/, '').trim().substring(0, 40);
+  /* Re-colour every element for print */
+  tmp.querySelectorAll('[style]').forEach(el => {
+    let s = el.getAttribute('style') || '';
+    s = s.replace(/background\s*:\s*#0f172a[^;]*;?/gi, 'background:#f8fafc;');
+    s = s.replace(/background\s*:\s*#1e293b[^;]*;?/gi, 'background:#f1f5f9;');
+    s = s.replace(/background\s*:\s*#182234[^;]*;?/gi, 'background:#f1f5f9;');
+    s = s.replace(/background\s*:\s*rgba\(17,\s*46,\s*35[^)]*\)[^;]*;?/gi, 'background:#ecfdf5;');
+    s = s.replace(/color\s*:\s*#f8fafc[^;]*;?/gi,  'color:#0f172a;');
+    s = s.replace(/color\s*:\s*#e2e8f0[^;]*;?/gi,  'color:#1e293b;');
+    s = s.replace(/color\s*:\s*#cbd5e1[^;]*;?/gi,  'color:#334155;');
+    s = s.replace(/color\s*:\s*#94a3b8[^;]*;?/gi,  'color:#475569;');
+    s = s.replace(/color\s*:\s*#64748b[^;]*;?/gi,  'color:#475569;');
+    s = s.replace(/box-shadow\s*:[^;]*;?/gi, '');
+    el.setAttribute('style', s);
+  });
 
-      // bar bg
-      doc.setFillColor(51, 65, 85);
-      doc.roundedRect(10, y, W-20, 5, 1, 1, 'F');
-      // bar fill
-      const fillW = ((W-20) * pct / 100);
-      doc.setFillColor(pct > 70 ? 34 : pct > 45 ? 234 : 239,
-                       pct > 70 ? 197 : pct > 45 ? 179 : 68,
-                       pct > 70 ? 94  : pct > 45 ? 8   : 68);
-      doc.roundedRect(10, y, fillW, 5, 1, 1, 'F');
+  /* The progress bars — keep their fill colours, just fix bg */
+  tmp.querySelectorAll('[style*="background:#334155"]').forEach(el => {
+    el.setAttribute('style', el.getAttribute('style').replace('background:#334155', 'background:#e2e8f0'));
+  });
 
-      doc.setFontSize(7);
-      doc.setTextColor(203, 213, 225);
-      doc.text(label, W-12, y+4, { align: 'right' });
-      doc.setTextColor(248, 250, 252);
-      doc.text(pct + '%', 14, y+4);
-      y += 8;
-    });
-    y += 4;
+  const reportBody = tmp.innerHTML;
+
+  /* ── Build print window HTML ── */
+  const printHTML = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>تقرير فحص المنتج — AI Inspector</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Tajawal', 'Segoe UI', Arial, sans-serif;
+    background: #ffffff;
+    color: #0f172a;
+    direction: rtl;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* ── Observations ── */
-  const obsDivs = [...tmp.querySelectorAll('[style*="border-right"]')];
-  if (obsDivs.length) {
-    doc.setFontSize(9);
-    doc.setTextColor(248, 250, 252);
-    doc.text('الملاحظات المرصودة', W-14, y+5, { align: 'right' });
-    y += 10;
-
-    obsDivs.slice(0, 6).forEach(od => {
-      const titleEl = od.querySelector('div');
-      const descEl  = od.querySelectorAll('div')[1];
-      const oTitle  = titleEl?.textContent?.trim().substring(0, 50) || '';
-      const oDesc   = descEl?.textContent?.trim().substring(0, 80)  || '';
-
-      doc.setFillColor(30, 41, 59);
-      doc.roundedRect(10, y, W-20, 12, 2, 2, 'F');
-      doc.setFontSize(8);
-      doc.setTextColor(248, 250, 252);
-      doc.text(oTitle, W-13, y+5, { align: 'right', maxWidth: W-40 });
-      doc.setFontSize(7);
-      doc.setTextColor(148, 163, 184);
-      doc.text(oDesc, W-13, y+10, { align: 'right', maxWidth: W-40 });
-      y += 15;
-
-      if (y > H - 40) { doc.addPage(); y = 20; }
-    });
-    y += 4;
+  /* ── Header ── */
+  .pdf-header {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 0 0 12px 12px;
+    margin-bottom: 20px;
   }
+  .pdf-header .brand { display: flex; align-items: center; gap: 12px; }
+  .pdf-header .brand img { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; }
+  .pdf-header .brand-name { font-size: 22px; font-weight: 800; color: #34d399; }
+  .pdf-header .brand-url  { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .pdf-header .meta { text-align: left; }
+  .pdf-header .meta .report-label { font-size: 13px; color: #94a3b8; }
+  .pdf-header .meta .report-date  { font-size: 12px; color: #cbd5e1; margin-top: 3px; }
 
-  /* ── Recommendation ── */
-  if (summary) {
-    doc.setFillColor(17, 46, 35);
-    doc.roundedRect(10, y, W-20, 24, 3, 3, 'F');
-    doc.setFontSize(9);
-    doc.setTextColor(52, 211, 153);
-    doc.text('التوصية النهائية', W-14, y+7, { align: 'right' });
-    doc.setFontSize(8);
-    doc.setTextColor(226, 232, 240);
-    const lines = doc.splitTextToSize(summary, W-30);
-    lines.slice(0, 3).forEach((line, i) => {
-      doc.text(line, W-13, y+13+(i*5), { align: 'right' });
-    });
-    y += 28;
+  /* ── Product strip ── */
+  .pdf-product {
+    background: #f1f5f9;
+    border-right: 4px solid #34d399;
+    padding: 10px 16px;
+    margin: 0 0 20px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 13px;
+  }
+  .pdf-product .label { color: #64748b; font-size: 11px; margin-bottom: 3px; }
+  .pdf-product .value { color: #0f172a; font-weight: 700; font-size: 14px; }
+
+  /* ── Report body wrapper — override dark bg ── */
+  .pdf-body {
+    padding: 0 4px;
+  }
+  .pdf-body * {
+    font-family: 'Tajawal', 'Segoe UI', Arial, sans-serif !important;
   }
 
   /* ── Footer ── */
-  const pages = doc.internal.getNumberOfPages();
-  for (let p = 1; p <= pages; p++) {
-    doc.setPage(p);
-    doc.setFillColor(15, 23, 42);
-    doc.rect(0, H-12, W, 12, 'F');
-    doc.setFontSize(7);
-    doc.setTextColor(100, 116, 139);
-    doc.text('هذا التقرير صادر من نظام AI Inspector — تحليل استرشادي آلي غير ملزم  |  editchecker.com', W/2, H-5, { align: 'center' });
+  .pdf-footer {
+    margin-top: 24px;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 12px;
+    text-align: center;
+    font-size: 10px;
+    color: #94a3b8;
   }
 
-  /* ── Save ── */
-  const filename = `AI-Inspector-${desc.substring(0,20).replace(/\s+/g,'-')}-${Date.now()}.pdf`;
-  doc.save(filename);
+  /* ── Page setup ── */
+  @page {
+    size: A4 portrait;
+    margin: 12mm 14mm;
+  }
+  @media print {
+    body { background: #ffffff !important; }
+    .no-print { display: none !important; }
+    .pdf-header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="pdf-header">
+  <div class="brand">
+    <img src="${logo}" alt="AI Inspector Logo">
+    <div>
+      <div class="brand-name">AI Inspector</div>
+      <div class="brand-url">editchecker.com</div>
+    </div>
+  </div>
+  <div class="meta">
+    <div class="report-label">تقرير فحص المنتج</div>
+    <div class="report-date">${date}</div>
+  </div>
+</div>
+
+<!-- Product description -->
+<div class="pdf-product">
+  <div class="label">المنتج / الوصف</div>
+  <div class="value">${desc}</div>
+</div>
+
+<!-- Inspection report (re-coloured) -->
+<div class="pdf-body">
+  ${reportBody}
+</div>
+
+<!-- Footer -->
+<div class="pdf-footer">
+  هذا التقرير صادر من نظام AI Inspector على editchecker.com — تحليل استرشادي آلي غير ملزم قانونياً
+</div>
+
+<script>
+  // Auto-trigger print after fonts load
+  document.fonts.ready.then(() => {
+    setTimeout(() => { window.print(); }, 600);
+  });
+<\/script>
+</body>
+</html>`;
+
+  /* ── Open in new window (works on desktop + mobile) ── */
+  const win = window.open('', '_blank', 'width=800,height=900');
+  if (!win) {
+    alert('يرجى السماح بالنوافذ المنبثقة في المتصفح لتحميل التقرير PDF.');
+    return;
+  }
+  win.document.open();
+  win.document.write(printHTML);
+  win.document.close();
 }
 </script>
