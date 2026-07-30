@@ -174,11 +174,10 @@ def analyze_image(image_bytes, caption, subject):
     b64        = base64.b64encode(compressed).decode()
     prompt     = get_dynamic_prompt(subject, caption)
 
-    # قائمة بالنماذج الممتازة الرائعة في قراءة الصور (يتم المحاولة بترتيب القائمة)
+    # الحد الأقصى المسموح به في OpenRouter هو 3 نماذج فقط
     payload = {
         "models": [
             "anthropic/claude-3.5-sonnet",
-            "anthropic/claude-3.5-sonnet:beta",
             "google/gemini-2.0-flash-001",
             "openai/gpt-4o-mini"
         ],
@@ -223,6 +222,11 @@ def analyze_image(image_bytes, caption, subject):
             "seller_claim_check": "cannot_confirm",
             "summary_for_user": "حدث خطأ تقني أثناء تحليل التقرير. يرجى إعادة الإرسال."
         }
+
+def send_reply(to_address, subject, html_body):
+    # تم إيقاف إرسال التقارير عبر الإيميل بناءً على طلبك
+    log.info("Email report sending disabled. Skipping email to %s", to_address)
+    return
 
 # ─── Formatting & Email Logic ───────────────────────────────────────────────
 def format_report_html(result):
