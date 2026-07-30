@@ -39,9 +39,9 @@ EXEMPT_EMAILS = {
 
 # ─── LemonSqueezy Variant IDs → (plan_name, credits) ───────────────────────
 PLAN_CREDITS = {
-    "e810b85b-5273-4da2-9477-f3cf62f9737d": ("basic", 10),
-    "db680fa5-9ec4-4fed-81fe-0ad4928266c3": ("pro",   50),
-    "ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072": ("vip",  120),
+    "1962077": ("basic", 10),
+    "1962093": ("pro",   50),
+    "1962096": ("vip",  120),
 }
 
 # ─── Database Helpers ───────────────────────────────────────────────────────
