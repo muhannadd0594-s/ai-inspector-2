@@ -171,7 +171,6 @@ CRITICAL:
     user = f'\n\nSeller caption:\n"{caption}"' if caption else ""
     return base + cat + user
 
-
 def analyze_image(image_bytes, caption, subject):
     if not OPENROUTER_API_KEY:
         log.error("OPENROUTER_API_KEY is missing from environment variables!")
@@ -208,21 +207,22 @@ def analyze_image(image_bytes, caption, subject):
         ]
     }
 
-    resp = requests.post(
-        "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)",
-        json=payload,
-        headers={
-            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "[https://editchecker.com](https://editchecker.com)",
-            "X-Title": "AI Product Inspector"
-        },
-        timeout=45
-    )
-
-    if resp.status_code != 200:
-        log.error("OpenRouter API Error [%d]: %s", resp.status_code, resp.text)
+    try:
+        resp = requests.post(
+            "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)",
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": f"https://{SITE_URL}",
+                "X-Title": "AI Product Inspector"
+            },
+            timeout=45
+        )
         resp.raise_for_status()
+    except requests.RequestException as e:
+        log.error("OpenRouter API Error: %s", str(e))
+        raise
 
     raw   = resp.json()["choices"][0]["message"]["content"]
     clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
@@ -241,12 +241,6 @@ def analyze_image(image_bytes, caption, subject):
             "observations": [],
             "summary_for_user": "حدث خطأ أثناء معالجة بيانات الفحص. يُرجى إعادة المحاولة."
         }
-
-
-def send_reply(to_address, subject, html_body):
-    log.info("Email report sending disabled. Skipping email to %s", to_address)
-    return
-
 
 def format_report_html(result):
     status = result.get("verdict_status", "warning")
@@ -348,38 +342,51 @@ def format_report_html(result):
     """
     
 def send_reply(to_address, subject, html_body):
-    resp = requests.post(
-        "[https://api.resend.com/emails](https://api.resend.com/emails)",
-        json={
-            "from": f"AI Product Inspector <{FROM_ADDRESS}>",
-            "to": [to_address],
-            "subject": f"تقرير فحص منتجك: Re: {subject}",
-            "html": html_body
-        },
-        headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        timeout=20
-    )
-    resp.raise_for_status()
-    log.info("Reply sent successfully to %s", to_address)
+    if not RESEND_API_KEY:
+        log.error("RESEND_API_KEY is not configured!")
+        return
+
+    try:
+        resp = requests.post(
+            "https://api.resend.com/emails",
+            json={
+                "from": f"AI Product Inspector <{FROM_ADDRESS}>",
+                "to": [to_address],
+                "subject": f"تقرير فحص منتجك: Re: {subject}",
+                "html": html_body
+            },
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            timeout=20
+        )
+        resp.raise_for_status()
+        log.info("Reply sent successfully to %s", to_address)
+    except requests.RequestException as e:
+        log.error("Failed to send reply to %s: %s", to_address, str(e))
 
 def forward_to_admin(sender, subject, body):
-    requests.post(
-        "[https://api.resend.com/emails](https://api.resend.com/emails)",
-        json={
-            "from": f"AI Inspector Bot <{FROM_ADDRESS}>",
-            "to": [ADMIN_EMAIL],
-            "subject": f"[دعم فني] من {sender}: {subject}",
-            "text": f"المرسل: {sender}\n\n{body}"
-        },
-        headers={
-            "Authorization": f"Bearer {RESEND_API_KEY}",
-            "Content-Type": "application/json"
-        },
-        timeout=20
-    )
+    if not RESEND_API_KEY:
+        return
+
+    try:
+        requests.post(
+            "https://api.resend.com/emails",
+            json={
+                "from": f"AI Inspector Bot <{FROM_ADDRESS}>",
+                "to": [ADMIN_EMAIL],
+                "subject": f"[دعم فني] من {sender}: {subject}",
+                "text": f"المرسل: {sender}\n\n{body}"
+            },
+            headers={
+                "Authorization": f"Bearer {RESEND_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            timeout=20
+        )
+    except requests.RequestException as e:
+        log.error("Failed to forward to admin: %s", str(e))
 
 def fetch_image_from_resend(email_id, attachments_meta):
     headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
@@ -388,21 +395,25 @@ def fetch_image_from_resend(email_id, attachments_meta):
         if not att_id or not att.get("content_type", "").startswith("image/"):
             continue
 
-        r = requests.get(
-            f"[https://api.resend.com/emails/receiving/](https://api.resend.com/emails/receiving/){email_id}/attachments/{att_id}",
-            headers=headers,
-            timeout=15
-        )
-        if r.status_code != 200:
-            continue
+        try:
+            r = requests.get(
+                f"https://api.resend.com/emails/receiving/{email_id}/attachments/{att_id}",
+                headers=headers,
+                timeout=15
+            )
+            if r.status_code != 200:
+                continue
 
-        dl = r.json().get("download_url")
-        if not dl:
-            continue
+            dl = r.json().get("download_url")
+            if not dl:
+                continue
 
-        img = requests.get(dl, timeout=20)
-        if img.status_code == 200:
-            return img.content
+            img = requests.get(dl, timeout=20)
+            if img.status_code == 200:
+                return img.content
+        except requests.RequestException as e:
+            log.error("Error fetching attachment %s: %s", att_id, str(e))
+            continue
     return None
 
 # ─── Routes ─────────────────────────────────────────────────────────────────
@@ -465,7 +476,7 @@ def resend_webhook():
 
         if email_id and RESEND_API_KEY:
             headers   = {"Authorization": f"Bearer {RESEND_API_KEY}"}
-            body_resp = requests.get(f"[https://api.resend.com/emails/receiving/](https://api.resend.com/emails/receiving/){email_id}",
+            body_resp = requests.get(f"https://api.resend.com/emails/receiving/{email_id}",
                                      headers=headers, timeout=15)
             if body_resp.status_code == 200:
                 bd = body_resp.json()
