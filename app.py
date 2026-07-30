@@ -361,7 +361,7 @@ def send_reply(to_address, subject, html_body):
             },
             timeout=20
         )
-        resp.raise_for_status()
+        resp.raise_for_status()  # <-- تأكد من مساواة المسافة هنا مع السطر الذي قبله
         log.info("Reply sent successfully to %s", to_address)
     except requests.RequestException as e:
         log.error("Failed to send reply to %s: %s", to_address, str(e))
