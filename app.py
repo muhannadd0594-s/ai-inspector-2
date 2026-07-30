@@ -133,17 +133,29 @@ def compress_image(image_bytes, max_size=(800, 800)):
 
 def get_dynamic_prompt(subject, caption):
     combined = f"{subject} {caption}".lower()
-    base = """You are a world-class AI Product Quality Inspector and Forensic E-commerce Authenticator.
-Analyze the product image and seller caption with extreme precision.
-Return ONLY a valid raw JSON object — no markdown, no code fences:
+    base = """أنت خبير واخصائي فحص جودة المنتجات وتوثيق حالة السلع.
+قم بتحليل صورة المنتج والوصف بدقة وإصدار تقرير فحص احترافي.
+يجب أن ترجع إجابتك ككائن JSON خام فقط (بدون markdown أو ```json):
 {
   "image_quality": "good|poor|unusable",
-  "quality_note": "سبب باللغة العربية حصراً إذا كانت الصورة سيئة، أو اتركها فارغة",
-  "observations": [{"type": "damage|discrepancy|inconsistency|note", "description": "باللغة العربية حصراً"}],
-  "seller_claim_check": "matches|contradicts|cannot_confirm",
-  "summary_for_user": "ملخص 2-3 جمل عربية، يبدأ بـ المنتج يبدو... أو نلاحظ...، ينتهي بتوصية واضحة"
+  "quality_note": "شرح مختصر جداً باللغة العربية إذا كانت الصورة غير واضحة، وإلا اتركها فارغة",
+  "overall_score": 75,
+  "verdict_title": "حالة جيدة مع ملاحظات طفيفة",
+  "verdict_status": "success|warning|danger",
+  "metrics": [
+    {"name": "النظافة وخلو السطح من العيوب", "score": 70},
+    {"name": "سلامة الهيكل والقماش/المعدن", "score": 80},
+    {"name": "التطابق مع وصف البائع", "score": 75}
+  ],
+  "observations": [
+    {"type": "damage|discrepancy|note", "title": "عنوان الملاحظة", "description": "شرح مختصر ومباشر باللغة العربية"}
+  ],
+  "summary_for_user": "توصية نهائية موجزة جداً (سطران كحد أقصى) توضح هل المنتج يستحق الشراء أم لا."
 }
-CRITICAL: ALL text values MUST be in Arabic ONLY. No English in values. If no issues, add 1-2 positive note observations."""
+CRITICAL: 
+1. جميع النصوص داخل JSON تكون باللغة العربية حصراً.
+2. التقييمات تكون واقعية وموزونة (بين 30% إلى 95%).
+3. حافظ على الاختصار الشديد والتركيز في الملاحظات."""
 
     if any(w in combined for w in ["جوال", "ايفون", "لابتوب", "شاشة", "ايباد", "phone", "electronics"]):
         cat = "\n\nFocus (Electronics): screen scratches, damaged corners, camera, back glass."
@@ -156,25 +168,28 @@ CRITICAL: ALL text values MUST be in Arabic ONLY. No English in values. If no is
     else:
         cat = "\n\nFocus (General): comprehensive quality inspection."
 
-    user = f'\n\nSeller caption:\n"{caption}"\nInspect accordingly.' if caption else \
-           "\n\nNo caption. Inspect based on category focus."
+    user = f'\n\nSeller caption:\n"{caption}"' if caption else ""
     return base + cat + user
+
 
 def analyze_image(image_bytes, caption, subject):
     if not OPENROUTER_API_KEY:
         log.error("OPENROUTER_API_KEY is missing from environment variables!")
         return {
             "image_quality": "unusable",
+            "quality_note": "مفتاح التشغيل غير متوفر.",
+            "overall_score": 0,
+            "verdict_title": "خطأ إعدادات",
+            "verdict_status": "danger",
+            "metrics": [],
             "observations": [],
-            "seller_claim_check": "cannot_confirm",
-            "summary_for_user": "خطأ في الإعدادات: مفتاح OpenRouter غير معرف."
+            "summary_for_user": "تعذر إجراء الفحص بسبب خطأ في الإعدادات."
         }
 
     compressed = compress_image(image_bytes)
     b64        = base64.b64encode(compressed).decode()
     prompt     = get_dynamic_prompt(subject, caption)
 
-    # الحد الأقصى المسموح به في OpenRouter هو 3 نماذج فقط
     payload = {
         "models": [
             "anthropic/claude-3.5-sonnet",
@@ -194,12 +209,12 @@ def analyze_image(image_bytes, caption, subject):
     }
 
     resp = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
+        "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)",
         json=payload,
         headers={
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://editchecker.com",
+            "HTTP-Referer": "[https://editchecker.com](https://editchecker.com)",
             "X-Title": "AI Product Inspector"
         },
         timeout=45
@@ -218,59 +233,120 @@ def analyze_image(image_bytes, caption, subject):
         log.error("JSON parse error: %s", raw)
         return {
             "image_quality": "unusable",
+            "quality_note": "تعذر تحليل الاستجابة بشكل صحيح.",
+            "overall_score": 50,
+            "verdict_title": "تحليل غير مكتمل",
+            "verdict_status": "warning",
+            "metrics": [],
             "observations": [],
-            "seller_claim_check": "cannot_confirm",
-            "summary_for_user": "حدث خطأ تقني أثناء تحليل التقرير. يرجى إعادة الإرسال."
+            "summary_for_user": "حدث خطأ أثناء معالجة بيانات الفحص. يُرجى إعادة المحاولة."
         }
 
+
 def send_reply(to_address, subject, html_body):
-    # تم إيقاف إرسال التقارير عبر الإيميل بناءً على طلبك
     log.info("Email report sending disabled. Skipping email to %s", to_address)
     return
 
-# ─── Formatting & Email Logic ───────────────────────────────────────────────
+
 def format_report_html(result):
+    status = result.get("verdict_status", "warning")
+    color_map = {
+        "success": {"badge_bg": "rgba(34, 197, 94, 0.15)", "border": "#22c55e", "text": "#4ade80"},
+        "warning": {"badge_bg": "rgba(234, 179, 8, 0.15)", "border": "#eab308", "text": "#fde047"},
+        "danger":  {"badge_bg": "rgba(239, 68, 68, 0.15)", "border": "#ef4444", "text": "#fca5a5"}
+    }
+    theme = color_map.get(status, color_map["warning"])
+
     if result.get("image_quality") in ("poor", "unusable"):
-        return (f'<div dir="rtl" style="font-family:Arial;padding:20px;background:#fce4e4;color:#cc0000;border-radius:8px;">'
-                f'<h3>⚠️ الصورة غير واضحة</h3><p>{result.get("quality_note", "نعتذر، لم نتمكن من قراءة التفاصيل.")}</p></div>')
+        note = result.get("quality_note", "الصورة المرفوقة غير واضحة بشكل كافٍ لإعطاء تقرير دقيق.")
+        return f"""
+        <div dir="rtl" style="background:#0f172a; border:1px solid #334155; border-radius:12px; padding:20px; color:#f8fafc; font-family:system-ui,-apple-system,sans-serif; text-align:right;">
+            <div style="background:rgba(239, 68, 68, 0.15); border:1px solid #ef4444; border-radius:8px; padding:15px; color:#fca5a5; font-weight:600; text-align:center;">
+                ⚠️ تعذر الفحص الدقيق: {note}
+            </div>
+        </div>
+        """
 
-    sc  = "#27ae60"
-    st  = "يبدو المنتج في حالة جيدة"
-    obs = result.get("observations", [])
-
-    if result.get("seller_claim_check") == "contradicts":
-        sc, st = "#e74c3c", "⚠️ تعارض محتمل مع وصف البائع!"
-    elif any(o["type"] in ("damage", "discrepancy") for o in obs):
-        sc, st = "#f39c12", "تم رصد بعض الملاحظات"
+    metrics_html = ""
+    for m in result.get("metrics", []):
+        score = min(max(int(m.get("score", 50)), 0), 100)
+        metrics_html += f"""
+        <div style="margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; font-size:13px; color:#cbd5e1; margin-bottom:4px;">
+                <span>{m.get('name', 'معيار الفحص')}</span>
+                <span style="font-weight:bold; color:#f8fafc;">{score}%</span>
+            </div>
+            <div style="background:#334155; height:6px; border-radius:3px; overflow:hidden;">
+                <div style="background:{theme['border']}; width:{score}%; height:100%; border-radius:3px;"></div>
+            </div>
+        </div>
+        """
 
     icons = {
-        "damage": "❌ [تلف]",
-        "discrepancy": "⚠️ [تعارض]",
-        "inconsistency": "🔍 [ملاحظة]",
-        "note": "💡 [معلومة]"
+        "damage": ("❌", "#ef4444"),
+        "discrepancy": ("⚠️", "#eab308"),
+        "note": ("💡", "#3b82f6")
     }
+    
+    obs_html = ""
+    for o in result.get("observations", []):
+        o_type = o.get("type", "note")
+        icon, o_color = icons.get(o_type, ("📌", "#94a3b8"))
+        obs_html += f"""
+        <div style="background:#1e293b; border-right:3px solid {o_color}; padding:10px 12px; border-radius:4px 8px 8px 4px; margin-bottom:8px;">
+            <div style="font-size:14px; font-weight:bold; color:#f8fafc; margin-bottom:2px;">
+                {icon} {o.get('title', 'ملاحظة')}
+            </div>
+            <div style="font-size:13px; color:#94a3b8; line-height:1.4;">
+                {o.get('description', '')}
+            </div>
+        </div>
+        """
 
-    obs_html = "".join(
-        f"<li style='margin-bottom:10px'><strong>{icons.get(o['type'], '📌')}</strong> {o['description']}</li>"
-        for o in obs
-    ) or "<li>لم يلاحظ النظام أي مشاكل ظاهرة.</li>"
+    if not obs_html:
+        obs_html = '<div style="font-size:13px; color:#94a3b8; text-align:center;">لم يتم تسجيل أي عيوب أو ملاحظات سلبية ظاهرة.</div>'
 
-    return f"""<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head><meta charset="UTF-8"></head>
-<body style="font-family:'Segoe UI',Tahoma,sans-serif;background:#f4f7f6;margin:0;padding:20px;">
-<div style="max-width:600px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,.05);">
-<div style="background:#2c3e50;color:#fff;padding:20px;text-align:center;"><h2 style="margin:0">🔍 تقرير فحص المنتج</h2></div>
-<div style="padding:30px;">
-<div style="background:{sc};color:white;padding:10px 15px;border-radius:6px;font-weight:bold;margin-bottom:20px;text-align:center">{st}</div>
-<h3 style="color:#2c3e50;border-bottom:2px solid #ecf0f1;padding-bottom:8px">الخلاصة:</h3>
-<p style="color:#34495e;line-height:1.6;font-size:16px">{result.get("summary_for_user","")}</p>
-<h3 style="color:#2c3e50;border-bottom:2px solid #ecf0f1;padding-bottom:8px;margin-top:25px">التفاصيل:</h3>
-<ul style="color:#34495e;line-height:1.6;font-size:15px;padding-right:20px">{obs_html}</ul>
-<p style="color:#95a5a6;font-size:11px;margin-top:20px;border-top:1px solid #ecf0f1;padding-top:15px;text-align:center">
-هذا تحليل آلي استرشادي غير ملزم. القرار النهائي يعود لك.</p>
-</div></div></body></html>"""
+    score_val = min(max(int(result.get("overall_score", 70)), 0), 100)
 
+    return f"""
+    <div dir="rtl" style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:24px; color:#f8fafc; font-family:system-ui,-apple-system,sans-serif; max-width:650px; margin:auto; text-align:right; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+        
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:18px; margin-bottom:20px;">
+            <div>
+                <span style="font-size:12px; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">تقرير الفحص الذكي</span>
+                <h3 style="margin:4px 0 0 0; font-size:18px; color:{theme['text']}; font-weight:bold;">
+                    {result.get('verdict_title', 'نتيجة الفحص')}
+                </h3>
+            </div>
+            <div style="background:{theme['badge_bg']}; border:1px solid {theme['border']}; border-radius:12px; padding:8px 16px; text-align:center;">
+                <div style="font-size:22px; font-weight:bold; color:{theme['text']}; line-height:1;">{score_val}<span style="font-size:13px; color:#94a3b8;">/100</span></div>
+                <div style="font-size:10px; color:#94a3b8; margin-top:2px;">التقييم العام</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:20px; background:#182234; padding:14px; border-radius:12px; border:1px solid #1e293b;">
+            <div style="font-size:13px; font-weight:bold; color:#f8fafc; margin-bottom:12px;">📊 مؤشرات الجودة التفصيلية:</div>
+            {metrics_html}
+        </div>
+
+        <div style="margin-bottom:20px;">
+            <div style="font-size:13px; font-weight:bold; color:#f8fafc; margin-bottom:10px;">🔍 الملاحظات المرصودة:</div>
+            {obs_html}
+        </div>
+
+        <div style="background:{theme['badge_bg']}; border:1px dashed {theme['border']}; border-radius:12px; padding:14px; margin-top:16px;">
+            <div style="font-size:13px; font-weight:bold; color:{theme['text']}; margin-bottom:4px;">💡 التوصية النهائية:</div>
+            <div style="font-size:13px; color:#e2e8f0; line-height:1.5;">
+                {result.get('summary_for_user', '')}
+            </div>
+        </div>
+
+        <div style="font-size:10px; color:#64748b; text-align:center; margin-top:16px; border-top:1px solid #1e293b; padding-top:10px;">
+            هذا التقرير الصادر من الذكاء الاصطناعي هو تحليل استرشادي بناءً على معالجة الصورة المرفقة.
+        </div>
+    </div>
+    """
+    
 def send_reply(to_address, subject, html_body):
     resp = requests.post(
         "[https://api.resend.com/emails](https://api.resend.com/emails)",
