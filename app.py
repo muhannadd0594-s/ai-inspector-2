@@ -33,7 +33,7 @@ PLAN_CREDITS = {
     "e810b85b-5273-4da2-9477-f3cf62f9737d": ("basic", 10),
     "db680fa5-9ec4-4fed-81fe-0ad4928266c3": ("pro",   50),
     "ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072": ("vip",  120),
-}}
+}
 
 def get_db():
     if "db" not in g:
