@@ -3,7 +3,6 @@ import json
 import base64
 import logging
 import email.utils
-import sqlite3
 import hashlib
 import hmac
 import io
@@ -12,6 +11,7 @@ from flask import Flask, request, jsonify, render_template, g
 import requests
 from dotenv import load_dotenv
 from PIL import Image
+import libsql_client
 
 load_dotenv()
 
@@ -26,10 +26,12 @@ LEMONSQUEEZY_SECRET = os.environ.get("LEMONSQUEEZY_SECRET", "")
 FROM_ADDRESS        = "inspector@inspector.editchecker.com"
 ADMIN_EMAIL         = "akashiiso04@gmail.com"
 SITE_URL            = "editchecker.com"
-DB_PATH             = os.environ.get("DB_PATH", "/tmp/inspector.db")
 FREE_CREDITS        = 3
 
-# ─── Exempt emails: unlimited-credit accounts ─────────────────────────────
+TURSO_URL   = os.environ.get("TURSO_URL", "")
+TURSO_TOKEN = os.environ.get("TURSO_TOKEN", "")
+
+# ─── Exempt emails ─────────────────────────────────────────────────────────
 EXEMPT_CREDITS = 999
 EXEMPT_EMAILS = {
     "akashiiso04@gmail.com",
@@ -37,57 +39,56 @@ EXEMPT_EMAILS = {
     "mohammdlghmd@gmail.com",
 }
 
-# ─── LemonSqueezy Variant IDs → (plan_name, credits) ───────────────────────
+# ─── LemonSqueezy Variant IDs ───────────────────────────────────────────────
 PLAN_CREDITS = {
     "1962077": ("basic", 10),
     "1962093": ("pro",   50),
     "1962096": ("vip",  120),
 }
 
-# ─── Database Helpers ───────────────────────────────────────────────────────
-def get_db():
-    if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("""CREATE TABLE IF NOT EXISTS users (
+# ─── Database Helpers (Turso) ───────────────────────────────────────────────
+def get_client():
+    return libsql_client.create_client_sync(
+        url=TURSO_URL,
+        auth_token=TURSO_TOKEN
+    )
+
+def init_db():
+    with get_client() as client:
+        client.execute("""CREATE TABLE IF NOT EXISTS users (
             email TEXT PRIMARY KEY,
             credits INTEGER DEFAULT 0,
             plan TEXT DEFAULT 'free',
             updated_at TEXT
         )""")
-        g.db.commit()
-    return g.db
-
-@app.teardown_appcontext
-def close_db(e=None):
-    db = g.pop("db", None)
-    if db:
-        db.close()
 
 def is_exempt(email_addr):
     return email_addr.strip().lower() in EXEMPT_EMAILS
 
 def get_or_create_user(email_addr):
-    db = get_db()
     email_addr = email_addr.strip().lower()
-    row = db.execute("SELECT * FROM users WHERE email=?", (email_addr,)).fetchone()
 
     if is_exempt(email_addr):
-        if row is None or row["credits"] != EXEMPT_CREDITS or row["plan"] != "exempt":
-            db.execute("""INSERT INTO users (email, credits, plan, updated_at) VALUES (?, ?, ?, ?)
-                          ON CONFLICT(email) DO UPDATE SET credits=excluded.credits,
-                          plan=excluded.plan, updated_at=excluded.updated_at""",
-                       (email_addr, EXEMPT_CREDITS, "exempt", datetime.utcnow().isoformat()))
-            db.commit()
+        with get_client() as client:
+            client.execute(
+                """INSERT INTO users (email, credits, plan, updated_at) VALUES (?, ?, ?, ?)
+                   ON CONFLICT(email) DO UPDATE SET credits=excluded.credits,
+                   plan=excluded.plan, updated_at=excluded.updated_at""",
+                [email_addr, EXEMPT_CREDITS, "exempt", datetime.utcnow().isoformat()]
+            )
         return {"email": email_addr, "credits": EXEMPT_CREDITS, "plan": "exempt"}
 
-    if row:
-        return dict(row)
+    with get_client() as client:
+        result = client.execute("SELECT * FROM users WHERE email=?", [email_addr])
+        if result.rows:
+            row = result.rows[0]
+            return {"email": row[0], "credits": row[1], "plan": row[2]}
 
-    db.execute("INSERT INTO users (email, credits, plan, updated_at) VALUES (?, ?, ?, ?)",
-               (email_addr, FREE_CREDITS, "free", datetime.utcnow().isoformat()))
-    db.commit()
-    return {"email": email_addr, "credits": FREE_CREDITS, "plan": "free"}
+        client.execute(
+            "INSERT INTO users (email, credits, plan, updated_at) VALUES (?, ?, ?, ?)",
+            [email_addr, FREE_CREDITS, "free", datetime.utcnow().isoformat()]
+        )
+        return {"email": email_addr, "credits": FREE_CREDITS, "plan": "free"}
 
 def deduct_credit(email_addr):
     email_addr = email_addr.strip().lower()
@@ -95,27 +96,35 @@ def deduct_credit(email_addr):
         get_or_create_user(email_addr)
         return True
 
-    db = get_db()
     user = get_or_create_user(email_addr)
     if user["credits"] <= 0:
         return False
 
-    db.execute("UPDATE users SET credits=credits-1, updated_at=? WHERE email=?",
-               (datetime.utcnow().isoformat(), email_addr))
-    db.commit()
+    with get_client() as client:
+        client.execute(
+            "UPDATE users SET credits=credits-1, updated_at=? WHERE email=?",
+            [datetime.utcnow().isoformat(), email_addr]
+        )
     return True
 
 def add_credits(email_addr, plan, amount):
     email_addr = email_addr.strip().lower()
-    db = get_db()
     get_or_create_user(email_addr)
-
     if is_exempt(email_addr):
         return
+    with get_client() as client:
+        client.execute(
+            "UPDATE users SET credits=credits+?, plan=?, updated_at=? WHERE email=?",
+            [amount, plan, datetime.utcnow().isoformat(), email_addr]
+        )
 
-    db.execute("UPDATE users SET credits=credits+?, plan=?, updated_at=? WHERE email=?",
-               (amount, plan, datetime.utcnow().isoformat(), email_addr))
-    db.commit()
+# ─── Init DB on startup ─────────────────────────────────────────────────────
+with app.app_context():
+    try:
+        init_db()
+        log.info("Turso DB initialized successfully")
+    except Exception as e:
+        log.error("Turso DB init error: %s", e)
 
 # ─── Image & AI Logic ───────────────────────────────────────────────────────
 def compress_image(image_bytes, max_size=(800, 800)):
@@ -173,7 +182,7 @@ CRITICAL:
 
 def analyze_image(image_bytes, caption, subject):
     if not OPENROUTER_API_KEY:
-        log.error("OPENROUTER_API_KEY is missing from environment variables!")
+        log.error("OPENROUTER_API_KEY is missing!")
         return {
             "image_quality": "unusable",
             "quality_note": "مفتاح التشغيل غير متوفر.",
@@ -190,7 +199,7 @@ def analyze_image(image_bytes, caption, subject):
     prompt     = get_dynamic_prompt(subject, caption)
 
     payload = {
-       "model": "google/gemini-2.5-pro",
+        "model": "google/gemini-2.5-pro",
         "temperature": 0.2,
         "messages": [
             {
@@ -229,13 +238,13 @@ def analyze_image(image_bytes, caption, subject):
         log.error("JSON parse error: %s", raw)
         return {
             "image_quality": "unusable",
-            "quality_note": "تعذر تحليل الاستجابة بشكل صحيح.",
+            "quality_note": "تعذر تحليل الاستجابة.",
             "overall_score": 50,
             "verdict_title": "تحليل غير مكتمل",
             "verdict_status": "warning",
             "metrics": [],
             "observations": [],
-            "summary_for_user": "حدث خطأ أثناء معالجة بيانات الفحص. يُرجى إعادة المحاولة."
+            "summary_for_user": "حدث خطأ أثناء المعالجة. يُرجى إعادة المحاولة."
         }
 
 def format_report_html(result):
@@ -248,7 +257,7 @@ def format_report_html(result):
     theme = color_map.get(status, color_map["warning"])
 
     if result.get("image_quality") in ("poor", "unusable"):
-        note = result.get("quality_note", "الصورة المرفوقة غير واضحة بشكل كافٍ لإعطاء تقرير دقيق.")
+        note = result.get("quality_note", "الصورة غير واضحة بشكل كافٍ.")
         return f"""
         <div dir="rtl" style="background:#0f172a; border:1px solid #334155; border-radius:12px; padding:20px; color:#f8fafc; font-family:system-ui,-apple-system,sans-serif; text-align:right;">
             <div style="background:rgba(239, 68, 68, 0.15); border:1px solid #ef4444; border-radius:8px; padding:15px; color:#fca5a5; font-weight:600; text-align:center;">
@@ -294,16 +303,15 @@ def format_report_html(result):
         """
 
     if not obs_html:
-        obs_html = '<div style="font-size:13px; color:#94a3b8; text-align:center;">لم يتم تسجيل أي عيوب أو ملاحظات سلبية ظاهرة.</div>'
+        obs_html = '<div style="font-size:13px; color:#94a3b8; text-align:center;">لم يتم تسجيل أي عيوب ظاهرة.</div>'
 
     score_val = min(max(int(result.get("overall_score", 70)), 0), 100)
 
     return f"""
     <div dir="rtl" style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:24px; color:#f8fafc; font-family:system-ui,-apple-system,sans-serif; max-width:650px; margin:auto; text-align:right; box-shadow:0 10px 25px rgba(0,0,0,0.3);">
-        
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:18px; margin-bottom:20px;">
             <div>
-                <span style="font-size:12px; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">تقرير الفحص الذكي</span>
+                <span style="font-size:12px; font-weight:600; color:#94a3b8;">تقرير الفحص الذكي</span>
                 <h3 style="margin:4px 0 0 0; font-size:18px; color:{theme['text']}; font-weight:bold;">
                     {result.get('verdict_title', 'نتيجة الفحص')}
                 </h3>
@@ -313,35 +321,29 @@ def format_report_html(result):
                 <div style="font-size:10px; color:#94a3b8; margin-top:2px;">التقييم العام</div>
             </div>
         </div>
-
         <div style="margin-bottom:20px; background:#182234; padding:14px; border-radius:12px; border:1px solid #1e293b;">
-            <div style="font-size:13px; font-weight:bold; color:#f8fafc; margin-bottom:12px;">📊 مؤشرات الجودة التفصيلية:</div>
+            <div style="font-size:13px; font-weight:bold; color:#f8fafc; margin-bottom:12px;">📊 مؤشرات الجودة:</div>
             {metrics_html}
         </div>
-
         <div style="margin-bottom:20px;">
-            <div style="font-size:13px; font-weight:bold; color:#f8fafc; margin-bottom:10px;">🔍 الملاحظات المرصودة:</div>
+            <div style="font-size:13px; font-weight:bold; color:#f8fafc; margin-bottom:10px;">🔍 الملاحظات:</div>
             {obs_html}
         </div>
-
         <div style="background:{theme['badge_bg']}; border:1px dashed {theme['border']}; border-radius:12px; padding:14px; margin-top:16px;">
             <div style="font-size:13px; font-weight:bold; color:{theme['text']}; margin-bottom:4px;">💡 التوصية النهائية:</div>
             <div style="font-size:13px; color:#e2e8f0; line-height:1.5;">
                 {result.get('summary_for_user', '')}
             </div>
         </div>
-
         <div style="font-size:10px; color:#64748b; text-align:center; margin-top:16px; border-top:1px solid #1e293b; padding-top:10px;">
-            هذا التقرير الصادر من الذكاء الاصطناعي هو تحليل استرشادي بناءً على معالجة الصورة المرفقة.
+            تحليل استرشادي آلي — القرار النهائي يعود إليك.
         </div>
     </div>
     """
 
 def send_reply(to_address, subject, html_body):
     if not RESEND_API_KEY:
-        log.error("RESEND_API_KEY is not configured!")
         return
-
     try:
         resp = requests.post(
             "https://api.resend.com/emails",
@@ -351,21 +353,17 @@ def send_reply(to_address, subject, html_body):
                 "subject": f"تقرير فحص منتجك: Re: {subject}",
                 "html": html_body
             },
-            headers={
-                "Authorization": f"Bearer {RESEND_API_KEY}",
-                "Content-Type": "application/json"
-            },
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
             timeout=20
         )
         resp.raise_for_status()
-        log.info("Reply sent successfully to %s", to_address)
+        log.info("Reply sent to %s", to_address)
     except requests.RequestException as e:
-        log.error("Failed to send reply to %s: %s", to_address, str(e))
+        log.error("Failed to send reply: %s", e)
 
 def forward_to_admin(sender, subject, body):
     if not RESEND_API_KEY:
         return
-
     try:
         requests.post(
             "https://api.resend.com/emails",
@@ -375,14 +373,11 @@ def forward_to_admin(sender, subject, body):
                 "subject": f"[دعم فني] من {sender}: {subject}",
                 "text": f"المرسل: {sender}\n\n{body}"
             },
-            headers={
-                "Authorization": f"Bearer {RESEND_API_KEY}",
-                "Content-Type": "application/json"
-            },
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
             timeout=20
         )
     except requests.RequestException as e:
-        log.error("Failed to forward to admin: %s", str(e))
+        log.error("Failed to forward to admin: %s", e)
 
 def fetch_image_from_resend(email_id, attachments_meta):
     headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
@@ -390,26 +385,21 @@ def fetch_image_from_resend(email_id, attachments_meta):
         att_id = att.get("id")
         if not att_id or not att.get("content_type", "").startswith("image/"):
             continue
-
         try:
             r = requests.get(
                 f"https://api.resend.com/emails/receiving/{email_id}/attachments/{att_id}",
-                headers=headers,
-                timeout=15
+                headers=headers, timeout=15
             )
             if r.status_code != 200:
                 continue
-
             dl = r.json().get("download_url")
             if not dl:
                 continue
-
             img = requests.get(dl, timeout=20)
             if img.status_code == 200:
                 return img.content
         except requests.RequestException as e:
-            log.error("Error fetching attachment %s: %s", att_id, str(e))
-            continue
+            log.error("Error fetching attachment: %s", e)
     return None
 
 # ─── Routes ─────────────────────────────────────────────────────────────────
@@ -472,8 +462,10 @@ def resend_webhook():
 
         if email_id and RESEND_API_KEY:
             headers   = {"Authorization": f"Bearer {RESEND_API_KEY}"}
-            body_resp = requests.get(f"https://api.resend.com/emails/receiving/{email_id}",
-                                     headers=headers, timeout=15)
+            body_resp = requests.get(
+                f"https://api.resend.com/emails/receiving/{email_id}",
+                headers=headers, timeout=15
+            )
             if body_resp.status_code == 200:
                 bd = body_resp.json()
                 caption = bd.get("text") or bd.get("html") or ""
@@ -547,6 +539,6 @@ def lemonsqueezy_webhook():
         log.exception("LemonSqueezy webhook error")
         return jsonify({"error": str(e)}), 500
 
-# ─── Main Execution ─────────────────────────────────────────────────────────
+# ─── Main ───────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
