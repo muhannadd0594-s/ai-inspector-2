@@ -208,17 +208,17 @@ def analyze_image(image_bytes, caption, subject):
     }
 
     try:
-       resp = requests.post(
-    "https://openrouter.ai/api/v1/chat/completions",
-    json=payload,
-    headers={
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": f"https://{SITE_URL}",
-        "X-Title": "AI Product Inspector"
-    },
-    timeout=45
-)
+        resp = requests.post(
+            "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)",
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": f"https://{SITE_URL}",
+                "X-Title": "AI Product Inspector"
+            },
+            timeout=45
+        )
         resp.raise_for_status()
     except requests.RequestException as e:
         log.error("OpenRouter API Error: %s", str(e))
@@ -281,7 +281,7 @@ def format_report_html(result):
         "discrepancy": ("⚠️", "#eab308"),
         "note": ("💡", "#3b82f6")
     }
-    
+
     obs_html = ""
     for o in result.get("observations", []):
         o_type = o.get("type", "note")
@@ -340,7 +340,7 @@ def format_report_html(result):
         </div>
     </div>
     """
-    
+
 def send_reply(to_address, subject, html_body):
     if not RESEND_API_KEY:
         log.error("RESEND_API_KEY is not configured!")
@@ -361,7 +361,7 @@ def send_reply(to_address, subject, html_body):
             },
             timeout=20
         )
-        resp.raise_for_status()  # <-- تأكد من مساواة المسافة هنا مع السطر الذي قبله
+        resp.raise_for_status()
         log.info("Reply sent successfully to %s", to_address)
     except requests.RequestException as e:
         log.error("Failed to send reply to %s: %s", to_address, str(e))
