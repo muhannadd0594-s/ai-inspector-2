@@ -11,7 +11,7 @@ from flask import Flask, request, jsonify, render_template, g
 import requests
 from dotenv import load_dotenv
 from PIL import Image
-import libsql_client
+import turso
 
 load_dotenv()
 
