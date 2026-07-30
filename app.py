@@ -174,21 +174,29 @@ def analyze_image(image_bytes, caption, subject):
     b64        = base64.b64encode(compressed).decode()
     prompt     = get_dynamic_prompt(subject, caption)
 
+    # قائمة بالنماذج الممتازة الرائعة في قراءة الصور (يتم المحاولة بترتيب القائمة)
+    payload = {
+        "models": [
+            "anthropic/claude-3.5-sonnet",
+            "anthropic/claude-3.5-sonnet:beta",
+            "google/gemini-2.0-flash-001",
+            "openai/gpt-4o-mini"
+        ],
+        "temperature": 0.2,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+                ]
+            }
+        ]
+    }
+
     resp = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
-        json={
-            "model": "anthropic/claude-3.5-sonnet-20240620",
-            "temperature": 0.2,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
-                    ]
-                }
-            ]
-        },
+        json=payload,
         headers={
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
