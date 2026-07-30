@@ -168,7 +168,7 @@ def analyze_image(image_bytes, caption, subject):
     resp = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
         json={
-            "model": "anthropic/claude-3.5-sonnet",
+            "model": "anthropic/claude-3.5-sonnet:beta",
             "temperature": 0.2,
             "messages": [
                 {
