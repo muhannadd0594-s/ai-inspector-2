@@ -161,6 +161,15 @@ CRITICAL: ALL text values MUST be in Arabic ONLY. No English in values. If no is
     return base + cat + user
 
 def analyze_image(image_bytes, caption, subject):
+    if not OPENROUTER_API_KEY:
+        log.error("OPENROUTER_API_KEY is missing from environment variables!")
+        return {
+            "image_quality": "unusable",
+            "observations": [],
+            "seller_claim_check": "cannot_confirm",
+            "summary_for_user": "خطأ في الإعدادات: مفتاح OpenRouter غير معرف."
+        }
+
     compressed = compress_image(image_bytes)
     b64        = base64.b64encode(compressed).decode()
     prompt     = get_dynamic_prompt(subject, caption)
@@ -168,7 +177,7 @@ def analyze_image(image_bytes, caption, subject):
     resp = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
         json={
-            "model": "anthropic/claude-3.5-sonnet:beta",
+            "model": "anthropic/claude-3.5-sonnet",
             "temperature": 0.2,
             "messages": [
                 {
@@ -182,11 +191,16 @@ def analyze_image(image_bytes, caption, subject):
         },
         headers={
             "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://editchecker.com",
+            "X-Title": "AI Product Inspector"
         },
         timeout=45
     )
-    resp.raise_for_status()
+
+    if resp.status_code != 200:
+        log.error("OpenRouter API Error [%d]: %s", resp.status_code, resp.text)
+        resp.raise_for_status()
 
     raw   = resp.json()["choices"][0]["message"]["content"]
     clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
