@@ -28,9 +28,6 @@ ADMIN_EMAIL         = "akashiiso04@gmail.com"
 SITE_URL            = "editchecker.com"
 FREE_CREDITS        = 3
 
-TURSO_URL   = os.environ.get("TURSO_URL", "")
-TURSO_TOKEN = os.environ.get("TURSO_TOKEN", "")
-
 # ─── Exempt emails ─────────────────────────────────────────────────────────
 EXEMPT_CREDITS = 999
 EXEMPT_EMAILS = {
@@ -46,65 +43,65 @@ PLAN_CREDITS = {
     "1962096": ("vip",  120),
 }
 
-# ─── Database Helpers (Turso) ───────────────────────────────────────────────
-def get_client():
-    return libsql_client.create_client_sync(
-        url=TURSO_URL,
-        auth_token=TURSO_TOKEN
-    )
+# ─── Database Helpers (Supabase) ────────────────────────────────────────────
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+
+def get_conn():
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 def init_db():
-    with get_client() as client:
-        client.execute("""CREATE TABLE IF NOT EXISTS users (
-            email TEXT PRIMARY KEY,
-            credits INTEGER DEFAULT 0,
-            plan TEXT DEFAULT 'free',
-            updated_at TEXT
-        )""")
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""CREATE TABLE IF NOT EXISTS users (
+                email TEXT PRIMARY KEY,
+                credits INTEGER DEFAULT 0,
+                plan TEXT DEFAULT 'free',
+                updated_at TEXT
+            )""")
+        conn.commit()
 
 def is_exempt(email_addr):
     return email_addr.strip().lower() in EXEMPT_EMAILS
 
 def get_or_create_user(email_addr):
     email_addr = email_addr.strip().lower()
-
     if is_exempt(email_addr):
-        with get_client() as client:
-            client.execute(
-                """INSERT INTO users (email, credits, plan, updated_at) VALUES (?, ?, ?, ?)
-                   ON CONFLICT(email) DO UPDATE SET credits=excluded.credits,
-                   plan=excluded.plan, updated_at=excluded.updated_at""",
-                [email_addr, EXEMPT_CREDITS, "exempt", datetime.utcnow().isoformat()]
-            )
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""INSERT INTO users (email, credits, plan, updated_at) VALUES (%s, %s, %s, %s)
+                               ON CONFLICT(email) DO UPDATE SET credits=EXCLUDED.credits,
+                               plan=EXCLUDED.plan, updated_at=EXCLUDED.updated_at""",
+                            (email_addr, EXEMPT_CREDITS, "exempt", datetime.utcnow().isoformat()))
+            conn.commit()
         return {"email": email_addr, "credits": EXEMPT_CREDITS, "plan": "exempt"}
 
-    with get_client() as client:
-        result = client.execute("SELECT * FROM users WHERE email=?", [email_addr])
-        if result.rows:
-            row = result.rows[0]
-            return {"email": row[0], "credits": row[1], "plan": row[2]}
-
-        client.execute(
-            "INSERT INTO users (email, credits, plan, updated_at) VALUES (?, ?, ?, ?)",
-            [email_addr, FREE_CREDITS, "free", datetime.utcnow().isoformat()]
-        )
-        return {"email": email_addr, "credits": FREE_CREDITS, "plan": "free"}
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE email=%s", (email_addr,))
+            row = cur.fetchone()
+            if row:
+                return dict(row)
+            cur.execute("INSERT INTO users (email, credits, plan, updated_at) VALUES (%s, %s, %s, %s)",
+                        (email_addr, FREE_CREDITS, "free", datetime.utcnow().isoformat()))
+        conn.commit()
+    return {"email": email_addr, "credits": FREE_CREDITS, "plan": "free"}
 
 def deduct_credit(email_addr):
     email_addr = email_addr.strip().lower()
     if is_exempt(email_addr):
         get_or_create_user(email_addr)
         return True
-
     user = get_or_create_user(email_addr)
     if user["credits"] <= 0:
         return False
-
-    with get_client() as client:
-        client.execute(
-            "UPDATE users SET credits=credits-1, updated_at=? WHERE email=?",
-            [datetime.utcnow().isoformat(), email_addr]
-        )
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET credits=credits-1, updated_at=%s WHERE email=%s",
+                        (datetime.utcnow().isoformat(), email_addr))
+        conn.commit()
     return True
 
 def add_credits(email_addr, plan, amount):
@@ -112,12 +109,12 @@ def add_credits(email_addr, plan, amount):
     get_or_create_user(email_addr)
     if is_exempt(email_addr):
         return
-    with get_client() as client:
-        client.execute(
-            "UPDATE users SET credits=credits+?, plan=?, updated_at=? WHERE email=?",
-            [amount, plan, datetime.utcnow().isoformat(), email_addr]
-        )
-
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("UPDATE users SET credits=credits+%s, plan=%s, updated_at=%s WHERE email=%s",
+                        (amount, plan, datetime.utcnow().isoformat(), email_addr))
+        conn.commit()
+        
 # ─── Init DB on startup ─────────────────────────────────────────────────────
 with app.app_context():
     try:
