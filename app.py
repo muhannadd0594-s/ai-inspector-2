@@ -1,283 +1,335 @@
-import os
-import json
-import base64
-import logging
-import email.utils
-from flask import Flask, request, jsonify, render_template
+import os, json, base64, logging, email.utils, sqlite3, hashlib, hmac, io
+from datetime import datetime
+from flask import Flask, request, jsonify, render_template, g
 import requests
 from dotenv import load_dotenv
-import io
 from PIL import Image
 
 load_dotenv()
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
-log = logging.getLogger("ai-inspector-web")
+log = logging.getLogger("ai-inspector")
 
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-RESEND_API_KEY     = os.environ.get("RESEND_API_KEY", "")
-FROM_ADDRESS       = "inspector@inspector.editchecker.com"
+OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
+RESEND_API_KEY      = os.environ.get("RESEND_API_KEY", "")
+LEMONSQUEEZY_SECRET = os.environ.get("LEMONSQUEEZY_SECRET", "")
+FROM_ADDRESS        = "inspector@inspector.editchecker.com"
+ADMIN_EMAIL         = "akashiiso04@gmail.com"
+SITE_URL            = "editchecker.com"
+DB_PATH             = os.environ.get("DB_PATH", "/tmp/inspector.db")
+FREE_CREDITS        = 3
 
-# -------------------------------------------------------------
-# ضغط الصور لتوفير الموارد
-# -------------------------------------------------------------
-def compress_image(image_bytes: bytes, max_size=(800, 800)) -> bytes:
+# ─── Exempt emails: unlimited-credit accounts that bypass payment/rate limits entirely ───
+EXEMPT_CREDITS = 999
+EXEMPT_EMAILS = {
+    "akashiiso04@gmail.com",
+    "muhannadd0594@gmail.com",
+    "mohammdlghmd@gmail.com",
+}
+
+# ─── LemonSqueezy Variant IDs → (plan_name, credits) ───────────────────────
+PLAN_CREDITS = {
+    "e810b85b-5273-4da2-9477-f3cf62f9737d": ("basic", 10),
+    "db680fa5-9ec4-4fed-81fe-0ad4928266c3": ("pro",   50),
+    "ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072": ("vip",  120),
+}}
+
+def get_db():
+    if "db" not in g:
+        g.db = sqlite3.connect(DB_PATH)
+        g.db.row_factory = sqlite3.Row
+        g.db.execute("""CREATE TABLE IF NOT EXISTS users (
+            email TEXT PRIMARY KEY, credits INTEGER DEFAULT 0,
+            plan TEXT DEFAULT 'free', updated_at TEXT)""")
+        g.db.commit()
+    return g.db
+
+@app.teardown_appcontext
+def close_db(e=None):
+    db = g.pop("db", None)
+    if db: db.close()
+
+def is_exempt(email_addr):
+    return email_addr.strip().lower() in EXEMPT_EMAILS
+
+def get_or_create_user(email_addr):
+    db  = get_db()
+    email_addr = email_addr.strip().lower()
+    row = db.execute("SELECT * FROM users WHERE email=?", (email_addr,)).fetchone()
+
+    if is_exempt(email_addr):
+        # Exempt accounts always carry an unlimited (999) credit balance and a
+        # dedicated plan tag, regardless of what's stored or how much they've used.
+        if row is None or row["credits"] != EXEMPT_CREDITS or row["plan"] != "exempt":
+            db.execute("""INSERT INTO users (email,credits,plan,updated_at) VALUES (?,?,?,?)
+                          ON CONFLICT(email) DO UPDATE SET credits=excluded.credits,
+                          plan=excluded.plan, updated_at=excluded.updated_at""",
+                       (email_addr, EXEMPT_CREDITS, "exempt", datetime.utcnow().isoformat()))
+            db.commit()
+        return {"email": email_addr, "credits": EXEMPT_CREDITS, "plan": "exempt"}
+
+    if row: return dict(row)
+    db.execute("INSERT INTO users (email,credits,plan,updated_at) VALUES (?,?,?,?)",
+               (email_addr, FREE_CREDITS, "free", datetime.utcnow().isoformat()))
+    db.commit()
+    return {"email": email_addr, "credits": FREE_CREDITS, "plan": "free"}
+
+def deduct_credit(email_addr):
+    email_addr = email_addr.strip().lower()
+    if is_exempt(email_addr):
+        # Exempt accounts bypass payment and consumption limits entirely.
+        get_or_create_user(email_addr)
+        return True
+    db = get_db()
+    if get_or_create_user(email_addr)["credits"] <= 0: return False
+    db.execute("UPDATE users SET credits=credits-1,updated_at=? WHERE email=?",
+               (datetime.utcnow().isoformat(), email_addr))
+    db.commit()
+    return True
+
+def add_credits(email_addr, plan, amount):
+    email_addr = email_addr.strip().lower()
+    db = get_db()
+    get_or_create_user(email_addr)
+    if is_exempt(email_addr):
+        # Exempt accounts don't need purchased credits stacked on top.
+        return
+    db.execute("UPDATE users SET credits=credits+?,plan=?,updated_at=? WHERE email=?",
+               (amount, plan, datetime.utcnow().isoformat(), email_addr))
+    db.commit()
+
+def compress_image(image_bytes, max_size=(800, 800)):
     try:
         img = Image.open(io.BytesIO(image_bytes))
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
+        if img.mode in ("RGBA","P"): img = img.convert("RGB")
         img.thumbnail(max_size, Image.Resampling.LANCZOS)
         out = io.BytesIO()
         img.save(out, format="JPEG", quality=85)
         return out.getvalue()
     except Exception as e:
-        log.error(f"Image compression failed: {e}")
+        log.error("compress_image: %s", e)
         return image_bytes
 
-# -------------------------------------------------------------
-# نظام الفئات والبرومبت الذكي
-# -------------------------------------------------------------
-def get_dynamic_prompt(subject: str, caption: str) -> str:
-    combined_text = f"{subject} {caption}".lower()
-    
-    base_prompt = """You are a world-class AI Product Quality Inspector and Forensic E-commerce Authenticator. Analyze the provided product image and the seller's caption with extreme precision.
-
-Return ONLY a valid JSON object strictly matching this structure, with absolutely NO extra text, markdown formatting, or English words in the text fields:
+def get_dynamic_prompt(subject, caption):
+    combined = f"{subject} {caption}".lower()
+    base = """You are a world-class AI Product Quality Inspector and Forensic E-commerce Authenticator.
+Analyze the product image and seller caption with extreme precision.
+Return ONLY a valid raw JSON object — no markdown, no code fences:
 {
   "image_quality": "good|poor|unusable",
-  "quality_note": "سبب دقيق باللغة العربية حصراً إذا كانت الصورة سيئة أو غير صالحة، أو اتركها فارغة",
-  "observations": [
-    {
-      "type": "damage|discrepancy|inconsistency|note",
-      "description": "صف العيب أو الملاحظة بمهنية ودقة تامة باللغة العربية حصراً"
-    }
-  ],
+  "quality_note": "سبب باللغة العربية حصراً إذا كانت الصورة سيئة، أو اتركها فارغة",
+  "observations": [{"type": "damage|discrepancy|inconsistency|note", "description": "باللغة العربية حصراً"}],
   "seller_claim_check": "matches|contradicts|cannot_confirm",
-  "summary_for_user": "ملخص تنفيذي من 2-3 جمل باللغة العربية حصراً، موجه للمشتري مباشرة، يبدأ بـ 'المنتج يبدو...' أو 'نلاحظ...'، يذكر أبرز نقطة إيجابية وأبرز نقطة سلبية إن وجدت، وينتهي بتوصية واضحة"
+  "summary_for_user": "ملخص 2-3 جمل عربية، يبدأ بـ المنتج يبدو... أو نلاحظ...، ينتهي بتوصية واضحة"
 }
+CRITICAL: ALL text values MUST be in Arabic ONLY. No English in values. If no issues, add 1-2 positive note observations."""
 
-CRITICAL RULES:
-1. EVERY text value inside the JSON MUST be strictly in Arabic language only. NO English words allowed in values.
-2. The fields "description", "quality_note", and "summary_for_user" must be 100% Arabic.
-3. Respond ONLY with the raw JSON object, nothing else.
-4. If no issues are found, still provide 1-2 positive observations (type: "note") about the product's condition."""
-
-    if any(word in combined_text for word in ["جوال", "الكترونيات", "ايفون", "لابتوب", "شاشة", "ايباد", "phone", "electronics"]):
-        category_focus = "\n\nCategory Focus (Electronics & Phones): Strictly inspect for screen scratches, damaged corners, camera lens cleanliness, and back glass cracks or defects."
-    elif any(word in combined_text for word in ["ساعة", "ماركة", "شنطة", "نظارة", "محفظة", "watch", "bag", "luxury"]):
-        category_focus = "\n\nCategory Focus (Watches & Luxury): Strictly inspect logo accuracy, stitching quality, engravings, and wear/tear on leather or metal."
-    elif any(word in combined_text for word in ["سيارة", "سيارات", "قطع", "صدام", "شمعة", "جنط", "car", "auto", "parts"]):
-        category_focus = "\n\nCategory Focus (Car Parts & Autos): Strictly inspect for rust, cracks, paint resprays or color differences, and dents."
-    elif any(word in combined_text for word in ["ملابس", "ازياء", "ثوب", "قميص", "فستان", "شوز", "حذاء", "clothes", "fashion"]):
-        category_focus = "\n\nCategory Focus (Clothing & Fashion): Strictly inspect fabric condition, visible stains, loose threads, and tears."
+    if any(w in combined for w in ["جوال","ايفون","لابتوب","شاشة","ايباد","phone","electronics"]):
+        cat = "\n\nFocus (Electronics): screen scratches, damaged corners, camera, back glass."
+    elif any(w in combined for w in ["ساعة","ماركة","شنطة","نظارة","محفظة","watch","bag","luxury"]):
+        cat = "\n\nFocus (Luxury): logo accuracy, stitching, engravings, leather/metal wear."
+    elif any(w in combined for w in ["سيارة","سيارات","قطع","صدام","جنط","car","auto"]):
+        cat = "\n\nFocus (Auto): rust, cracks, paint resprays, color differences, dents."
+    elif any(w in combined for w in ["ملابس","ثوب","قميص","فستان","حذاء","clothes","fashion"]):
+        cat = "\n\nFocus (Fashion): fabric condition, stains, loose threads, tears."
     else:
-        category_focus = "\n\nCategory Focus (General): Perform a general quality inspection on the product."
+        cat = "\n\nFocus (General): comprehensive quality inspection."
 
-    if caption:
-        user_text = f"\n\nSeller's caption / user notes:\n\"{caption}\"\n\nInspect the image according to these claims."
-    else:
-        user_text = "\n\nNo seller caption provided. Inspect the image based on the category focus."
+    user = f'\n\nSeller caption:\n"{caption}"\nInspect accordingly.' if caption else \
+           "\n\nNo caption. Inspect based on category focus."
+    return base + cat + user
 
-    return base_prompt + category_focus + user_text
-
-# -------------------------------------------------------------
-# تحليل الصورة عبر الذكاء الاصطناعي (تم التحديث لـ Claude 3.5 Sonnet)
-# -------------------------------------------------------------
-def analyze_image(image_bytes: bytes, caption: str, subject: str) -> dict:
-    compressed_bytes = compress_image(image_bytes)
-    b64 = base64.b64encode(compressed_bytes).decode()
-    final_prompt = get_dynamic_prompt(subject, caption)
-
-    payload = {
-        "model": "anthropic/claude-3.5-sonnet",
-        "messages": [{
-            "role": "user",
-            "content": [
-                {"type": "text", "text": final_prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
-            ],
-        }],
-        "temperature": 0.2,
-    }
+def analyze_image(image_bytes, caption, subject):
+    compressed = compress_image(image_bytes)
+    b64        = base64.b64encode(compressed).decode()
+    prompt     = get_dynamic_prompt(subject, caption)
     resp = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
-        json=payload,
-        headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}", "Content-Type": "application/json"},
-        timeout=45,
-    )
+        json={"model":"anthropic/claude-3.5-sonnet","temperature":0.2,
+              "messages":[{"role":"user","content":[
+                  {"type":"text","text":prompt},
+                  {"type":"image_url","image_url":{"url":f"data:image/jpeg;base64,{b64}"}}]}]},
+        headers={"Authorization":f"Bearer {OPENROUTER_API_KEY}","Content-Type":"application/json"},
+        timeout=45)
     resp.raise_for_status()
-    raw = resp.json()["choices"][0]["message"]["content"]
+    raw   = resp.json()["choices"][0]["message"]["content"]
     clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
     try:
         return json.loads(clean)
     except json.JSONDecodeError:
-        log.error("Failed to parse model response: %s", raw)
-        return {
-            "image_quality": "unusable",
-            "observations": [],
-            "seller_claim_check": "cannot_confirm",
-            "summary_for_user": "حدث خطأ تقني في تحليل الاستجابة. أعد الإرسال من فضلك.",
-        }
+        log.error("Parse error: %s", raw)
+        return {"image_quality":"unusable","observations":[],"seller_claim_check":"cannot_confirm",
+                "summary_for_user":"حدث خطأ تقني. أعد الإرسال."}
 
-# -------------------------------------------------------------
-# تنسيق تقرير HTML باللغة العربية (مع إخلاء المسؤولية)
-# -------------------------------------------------------------
-def format_report_html(result: dict) -> str:
-    status_color = "#27ae60"
-    status_text = "يبدو المنتج في حالة جيدة"
+def format_report_html(result):
+    if result.get("image_quality") in ("poor","unusable"):
+        return (f'<div dir="rtl" style="font-family:Arial;padding:20px;background:#fce4e4;color:#cc0000;border-radius:8px;">'
+                f'<h3>⚠️ الصورة غير واضحة</h3><p>{result.get("quality_note","نعتذر.")}</p></div>')
+    sc  = "#27ae60"; st = "يبدو المنتج في حالة جيدة"
+    obs = result.get("observations",[])
+    if result.get("seller_claim_check")=="contradicts": sc,st="#e74c3c","⚠️ تعارض محتمل مع وصف البائع!"
+    elif any(o["type"] in ("damage","discrepancy") for o in obs): sc,st="#f39c12","تم رصد بعض الملاحظات"
+    icons={"damage":"❌ [تلف]","discrepancy":"⚠️ [تعارض]","inconsistency":"🔍 [ملاحظة]","note":"💡 [معلومة]"}
+    obs_html="".join(f"<li style='margin-bottom:10px'><strong>{icons.get(o['type'],'📌')}</strong> {o['description']}</li>" for o in obs) \
+             or "<li>لم يلاحظ النظام أي مشاكل ظاهرة.</li>"
+    return f"""<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"></head>
+<body style="font-family:'Segoe UI',Tahoma,sans-serif;background:#f4f7f6;margin:0;padding:20px;">
+<div style="max-width:600px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,.05);">
+<div style="background:#2c3e50;color:#fff;padding:20px;text-align:center;"><h2 style="margin:0">🔍 تقرير فحص المنتج</h2></div>
+<div style="padding:30px;">
+<div style="background:{sc};color:white;padding:10px 15px;border-radius:6px;font-weight:bold;margin-bottom:20px;text-align:center">{st}</div>
+<h3 style="color:#2c3e50;border-bottom:2px solid #ecf0f1;padding-bottom:8px">الخلاصة:</h3>
+<p style="color:#34495e;line-height:1.6;font-size:16px">{result.get("summary_for_user","")}</p>
+<h3 style="color:#2c3e50;border-bottom:2px solid #ecf0f1;padding-bottom:8px;margin-top:25px">التفاصيل:</h3>
+<ul style="color:#34495e;line-height:1.6;font-size:15px;padding-right:20px">{obs_html}</ul>
+<p style="color:#95a5a6;font-size:11px;margin-top:20px;border-top:1px solid #ecf0f1;padding-top:15px;text-align:center">
+هذا تحليل آلي استرشادي غير ملزم. القرار النهائي يعود لك.</p>
+</div></div></body></html>"""
 
-    if result.get("image_quality") in ("poor", "unusable"):
-        return f"""
-        <div dir="rtl" style="font-family: Arial, sans-serif; padding: 20px; background-color: #fce4e4; color: #cc0000; border-radius: 8px;">
-            <h3>⚠️ الصورة غير واضحة</h3>
-            <p>{result.get('quality_note', 'نعتذر، لم نتمكن من فحص المنتج بوضوح.')}</p>
-        </div>
-        """
-
-    if result.get("seller_claim_check") == "contradicts":
-        status_color = "#e74c3c"
-        status_text = "⚠️ تنبيه: يوجد تعارض محتمل مع وصف البائع!"
-    elif result.get("observations") and any(o['type'] in ('damage', 'discrepancy') for o in result.get("observations")):
-        status_color = "#f39c12"
-        status_text = "تم رصد بعض الملاحظات على المنتج"
-
-    obs_html = ""
-    icons = {"damage": "❌ [تلف]", "discrepancy": "⚠️ [تعارض]", "inconsistency": "🔍 [ملاحظة]", "note": "💡 [معلومة]"}
-    for o in result.get("observations", []):
-        obs_html += f"<li style='margin-bottom: 10px;'><strong>{icons.get(o['type'], '📌')}</strong> {o['description']}</li>"
-
-    if not obs_html:
-        obs_html = "<li>لم يلاحظ النظام أي مشاكل ظاهرة على المنتج.</li>"
-
-    return f"""
-    <!DOCTYPE html>
-    <html lang="ar" dir="rtl">
-    <head><meta charset="UTF-8"></head>
-    <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px;">
-        <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-            <div style="background-color: #2c3e50; color: #ffffff; padding: 20px; text-align: center;">
-                <h2 style="margin: 0; font-size: 24px;">🔍 التقرير الآلي لفحص المنتج</h2>
-            </div>
-            <div style="padding: 30px;">
-                <div style="background-color: {status_color}; color: white; padding: 10px 15px; border-radius: 6px; font-weight: bold; margin-bottom: 20px; text-align: center;">
-                    {status_text}
-                </div>
-                <h3 style="color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px;">الخلاصة:</h3>
-                <p style="color: #34495e; line-height: 1.6; font-size: 16px;">{result.get('summary_for_user', 'لا توجد خلاصة متاحة.')}</p>
-                <h3 style="color: #2c3e50; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px; margin-top: 25px;">التفاصيل والملاحظات:</h3>
-                <ul style="color: #34495e; line-height: 1.6; font-size: 15px; padding-right: 20px;">{obs_html}</ul>
-                
-                <!-- إخلاء المسؤولية القانونية -->
-                <div style="margin-top: 35px; padding-top: 15px; border-top: 1px dashed #bdc3c7; text-align: center; font-size: 11px; color: #7f8c8d; line-height: 1.6;">
-                    <strong>⚠️ إخلاء مسؤولية:</strong> هذا التقرير هو أداة استشارية مبنية على التحليل الآلي للصور، ولا يغني عن الفحص الفني أو الميكانيكي على أرض الواقع. الخدمة لا تتحمل أي مسؤولية قانونية أو مالية عن قرارات الشراء أو البيع، أو عن حالة المنتج الفعلية.
-                </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-
-# -------------------------------------------------------------
-# إرسال الرد عبر Resend API
-# -------------------------------------------------------------
-def send_reply(to_address: str, subject: str, html_body: str):
-    resp = requests.post(
-        "[https://api.resend.com/emails](https://api.resend.com/emails)",
-        json={
-            "from": f"AI Product Inspector <{FROM_ADDRESS}>",
-            "to": [to_address],
-            "subject": f"تقرير فحص منتجك: Re: {subject}",
-            "html": html_body,
-        },
-        headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
-        timeout=20,
-    )
+def send_reply(to_address, subject, html_body):
+    resp = requests.post("https://api.resend.com/emails",
+        json={"from":f"AI Product Inspector <{FROM_ADDRESS}>","to":[to_address],
+              "subject":f"تقرير فحص منتجك: Re: {subject}","html":html_body},
+        headers={"Authorization":f"Bearer {RESEND_API_KEY}","Content-Type":"application/json"},timeout=20)
     resp.raise_for_status()
-    log.info("Reply sent successfully to %s", to_address)
+    log.info("Reply sent to %s", to_address)
 
-# -------------------------------------------------------------
-# الصفحة الرئيسية
-# -------------------------------------------------------------
+def forward_to_admin(sender, subject, body):
+    requests.post("https://api.resend.com/emails",
+        json={"from":f"AI Inspector Bot <{FROM_ADDRESS}>","to":[ADMIN_EMAIL],
+              "subject":f"[دعم فني] من {sender}: {subject}","text":f"المرسل: {sender}\n\n{body}"},
+        headers={"Authorization":f"Bearer {RESEND_API_KEY}","Content-Type":"application/json"},timeout=20)
+
+def fetch_image_from_resend(email_id, attachments_meta):
+    headers = {"Authorization":f"Bearer {RESEND_API_KEY}"}
+    for att in attachments_meta:
+        att_id = att.get("id")
+        if not att_id or not att.get("content_type","").startswith("image/"): continue
+        r = requests.get(f"https://api.resend.com/emails/receiving/{email_id}/attachments/{att_id}",
+                         headers=headers, timeout=15)
+        if r.status_code != 200: continue
+        dl = r.json().get("download_url")
+        if not dl: continue
+        img = requests.get(dl, timeout=20)
+        if img.status_code == 200: return img.content
+    return None
+
 @app.route("/", methods=["GET"])
 def home():
     return render_template("index.html")
 
-# -------------------------------------------------------------
-# نقطة استقبال الإشعار من السحاب (Webhook)
-# -------------------------------------------------------------
+@app.route("/credits", methods=["GET"])
+def credits_check():
+    email_addr = request.args.get("email","").strip().lower()
+    if not email_addr: return jsonify({"error":"email required"}), 400
+    user = get_or_create_user(email_addr)
+    return jsonify({"credits":user["credits"],"plan":user["plan"]})
+
+@app.route("/upload", methods=["POST"])
+def direct_upload():
+    email_addr  = request.form.get("email","").strip().lower()
+    description = request.form.get("description","")
+    image_file  = request.files.get("image")
+    if not email_addr: return jsonify({"error":"البريد الإلكتروني مطلوب"}), 400
+    if not image_file: return jsonify({"error":"لم يتم رفع أي صورة"}), 400
+    if not deduct_credit(email_addr):
+        return jsonify({"error":"نفد رصيدك","credits":0}), 402
+    try:
+        result = analyze_image(image_file.read(), description, description)
+        user   = get_or_create_user(email_addr)
+        return jsonify({"status":"success","report":format_report_html(result),"credits":user["credits"]})
+    except Exception as e:
+        log.exception("Upload error")
+        return jsonify({"error":str(e)}), 500
+
 @app.route("/webhook", methods=["POST"])
-def webhook():
+def resend_webhook():
     try:
         event = request.get_json(force=True, silent=True) or {}
-        data = event.get("data", event)
-
+        data  = event.get("data", event)
         email_id = data.get("email_id") or data.get("id")
-
-        raw_from = data.get("from", "")
-        if isinstance(raw_from, list) and raw_from:
-            raw_from = raw_from[0]
+        raw_from = data.get("from","")
+        if isinstance(raw_from,list) and raw_from: raw_from = raw_from[0]
         _, sender = email.utils.parseaddr(str(raw_from))
-        if not sender:
-            sender = str(raw_from)
-
-        subject = data.get("subject", "")
-        attachments_meta = data.get("attachments", [])
-
-        image_bytes = None
-        caption = ""
-
+        if not sender: sender = str(raw_from)
+        subject          = data.get("subject","")
+        attachments_meta = data.get("attachments",[])
+        caption          = ""
         if email_id and RESEND_API_KEY:
-            headers = {"Authorization": f"Bearer {RESEND_API_KEY}"}
-
-            body_resp = requests.get(
-                f"[https://api.resend.com/emails/receiving/](https://api.resend.com/emails/receiving/){email_id}",
-                headers=headers, timeout=15,
-            )
+            headers   = {"Authorization":f"Bearer {RESEND_API_KEY}"}
+            body_resp = requests.get(f"https://api.resend.com/emails/receiving/{email_id}",
+                                     headers=headers, timeout=15)
             if body_resp.status_code == 200:
-                body_data = body_resp.json()
-                caption = body_data.get("text") or body_data.get("html") or ""
-            else:
-                log.warning("Could not fetch email body: %s %s", body_resp.status_code, body_resp.text)
-
-            for att in attachments_meta:
-                att_id = att.get("id")
-                content_type = att.get("content_type", "")
-                if not att_id or not content_type.startswith("image/"):
-                    continue
-
-                att_resp = requests.get(
-                    f"[https://api.resend.com/emails/receiving/](https://api.resend.com/emails/receiving/){email_id}/attachments/{att_id}",
-                    headers=headers, timeout=15,
-                )
-                if att_resp.status_code != 200:
-                    log.warning("Could not fetch attachment metadata: %s %s", att_resp.status_code, att_resp.text)
-                    continue
-
-                download_url = att_resp.json().get("download_url")
-                if not download_url:
-                    continue
-
-                file_resp = requests.get(download_url, timeout=20)
-                if file_resp.status_code == 200:
-                    image_bytes = file_resp.content
-                    break
-                else:
-                    log.warning("Could not download attachment file: %s", file_resp.status_code)
-
+                bd = body_resp.json()
+                caption = bd.get("text") or bd.get("html") or ""
+        image_bytes = fetch_image_from_resend(email_id, attachments_meta) if email_id else None
         if image_bytes and sender:
-            log.info("Processing email from: %s subject: %s", sender, subject)
+            log.info("Analyzing email from %s", sender)
             result = analyze_image(image_bytes, caption, subject)
-            report_html = format_report_html(result)
-            send_reply(sender, subject, report_html)
-            return jsonify({"status": "success", "message": "Analyzed and replied"}), 200
+            send_reply(sender, subject, format_report_html(result))
+            return jsonify({"status":"success"}), 200
+        if sender and caption:
+            forward_to_admin(sender, subject, caption)
+        return jsonify({"status":"ignored"}), 200
+    except Exception as e:
+        log.exception("Webhook error")
+        return jsonify({"status":"error","message":str(e)}), 500
 
-        log.info("No valid image attachment retrieved for email_id=%s", email_id)
-        return jsonify({"status": "ignored", "message": "No valid image found"}), 200
+@app.route("/lemonsqueezy/webhook", methods=["POST"])
+def lemonsqueezy_webhook():
+    raw_body  = request.get_data()
+    signature = request.headers.get("X-Signature", "")
+
+    if LEMONSQUEEZY_SECRET:
+        expected = hmac.new(
+            LEMONSQUEEZY_SECRET.encode(), raw_body, hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected, signature):
+            log.warning("LemonSqueezy: invalid signature")
+            return jsonify({"error": "invalid signature"}), 401
+    else:
+        log.warning("LemonSqueezy: LEMONSQUEEZY_SECRET not set — skipping signature check")
+
+    try:
+        payload    = request.get_json(force=True) or {}
+        event_name = payload.get("meta", {}).get("event_name", "")
+
+        if event_name != "order_created":
+            return jsonify({"status": "ignored", "event": event_name}), 200
+
+        attrs          = payload.get("data", {}).get("attributes", {})
+        customer_email = attrs.get("user_email", "").strip().lower()
+
+        if not customer_email:
+            log.error("LemonSqueezy: no customer email in payload")
+            return jsonify({"error": "no email"}), 400
+
+        variant_id = None
+        for item in payload.get("included", []):
+            if item.get("type") == "order-items":
+                raw_vid    = item.get("attributes", {}).get("variant_id", "")
+                variant_id = str(raw_vid).strip()
+                break
+
+        if not variant_id:
+            log.error("LemonSqueezy: variant_id not found in payload")
+            return jsonify({"status": "no_variant"}), 200
+
+        plan_info = PLAN_CREDITS.get(variant_id)
+        if not plan_info:
+            log.warning("LemonSqueezy: unknown variant_id=%s", variant_id)
+            return jsonify({"status": "unknown_plan", "variant_id": variant_id}), 200
+
+        plan_name, credits = plan_info
+        add_credits(customer_email, plan_name, credits)
+        log.info("Granted %d credits (%s) to %s via variant %s",
+                 credits, plan_name, customer_email, variant_id)
+        return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
 
     except Exception as e:
-        log.exception("Webhook processing error")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        log.exception("LemonSqueezy webhook error")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT",5000)))
