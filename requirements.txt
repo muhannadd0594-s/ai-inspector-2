@@ -3,4 +3,4 @@ requests
 Pillow
 python-dotenv
 gunicorn
-libsql-client
+pyturso
