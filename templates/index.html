@@ -565,10 +565,8 @@
 <script>
 /* ── Logo inject (navbar + footer) ── */
 document.addEventListener('DOMContentLoaded', () => {
-  const b64 = document.getElementById('logo-b64-store').textContent.trim();
-  const src  = 'data:image/png;base64,' + b64;
-  document.getElementById('nav-logo').src    = src;
-  document.getElementById('footer-logo').src = src;
+  document.getElementById('nav-logo').src    = '/static/logo.png';
+  document.getElementById('footer-logo').src = '/static/logo.png';
 });
 
 /* ── Modal helpers ── */
