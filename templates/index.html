@@ -655,18 +655,18 @@ async function submitUpload() {
   if (!email) { showError('يرجى إدخال بريدك الإلكتروني'); return; }
   if (files.length === 0)  { showError('يرجى اختيار صورة'); return; }
 
-  // قائمة الإيميلات المحمية الخاصة بك (ضع إيميلاتك الثلاثة هنا)
+  // قائمة الإيميلات المحمية الخاصة بك
   const protectedEmails = [
     'muhannadd0594@gmail.com', 
-    'email2@gmail.com', // استبدل هذا بإيميلك الثاني
-    'email3@gmail.com'  // استبدل هذا بإيميلك الثالث
+    'email2@gmail.com', 
+    'email3@gmail.com'  
   ];
 
   if (protectedEmails.includes(email.toLowerCase())) {
     const secretCode = prompt('هذا البريد محمي، الرجاء إدخال الرمز السري لاستخدامه:');
     if (secretCode !== '1117630887') {
       showError('الرمز السري غير صحيح، تم رفض العملية.');
-      return; // إيقاف العملية
+      return; 
     }
   }
 
@@ -678,7 +678,6 @@ async function submitUpload() {
   form.append('email',       email);
   form.append('description', desc);
   
-  // Append multiple images properly to match app.py logic
   for (let i = 0; i < files.length; i++) {
     form.append('images', files[i]);
   }
@@ -697,7 +696,6 @@ async function submitUpload() {
       return;
     }
 
-    /* Save report html for PDF generation */
     window._lastReportHtml = data.report;
     window._lastDesc       = desc || 'تقرير فحص المنتج';
 
@@ -707,7 +705,6 @@ async function submitUpload() {
     resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     const credEl = document.getElementById('credits-info');
-    const plan   = data.plan || '';
     credEl.textContent = `الرصيد المتبقي: ${data.credits} فحص`;
 
   } catch(e) {
