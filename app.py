@@ -6,12 +6,14 @@ import email.utils
 import hashlib
 import hmac
 import io
+import math
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, g
 import requests
 from dotenv import load_dotenv
 from PIL import Image
 import psycopg2
+from psycopg2.extras import RealDictCursor
 
 load_dotenv()
 
@@ -27,6 +29,7 @@ FROM_ADDRESS        = "inspector@inspector.editchecker.com"
 ADMIN_EMAIL         = "akashiiso04@gmail.com"
 SITE_URL            = "editchecker.com"
 FREE_CREDITS        = 3
+DATABASE_URL        = os.environ.get("DATABASE_URL", "")
 
 # ─── Exempt emails ─────────────────────────────────────────────────────────
 EXEMPT_CREDITS = 999
@@ -43,12 +46,20 @@ PLAN_CREDITS = {
     "1962096": ("vip",  120),
 }
 
-# ─── Database Helpers (Supabase) ────────────────────────────────────────────
-import psycopg2
-from psycopg2.extras import RealDictCursor
+# ─── Plan photo limits ──────────────────────────────────────────────────────
+PLAN_PHOTO_LIMITS = {
+    "free":   1,
+    "basic":  1,
+    "pro":    2,
+    "vip":    4,
+    "exempt": 4,
+}
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
+VIP_MAX_CREDITS    = 200
+VIP_LOYALTY_MONTHS = 3
+VIP_LOYALTY_BONUS  = 30
 
+# ─── Database ───────────────────────────────────────────────────────────────
 def get_conn():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
@@ -59,8 +70,21 @@ def init_db():
                 email TEXT PRIMARY KEY,
                 credits INTEGER DEFAULT 0,
                 plan TEXT DEFAULT 'free',
-                updated_at TEXT
+                updated_at TEXT,
+                consecutive_vip_months INTEGER DEFAULT 0,
+                custom_brand_logo_url TEXT DEFAULT '',
+                custom_brand_contact TEXT DEFAULT ''
             )""")
+            # Add new columns if upgrading from old schema
+            for col, definition in [
+                ("consecutive_vip_months", "INTEGER DEFAULT 0"),
+                ("custom_brand_logo_url",  "TEXT DEFAULT ''"),
+                ("custom_brand_contact",   "TEXT DEFAULT ''"),
+            ]:
+                try:
+                    cur.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+                except Exception:
+                    pass
         conn.commit()
 
 def is_exempt(email_addr):
@@ -71,12 +95,16 @@ def get_or_create_user(email_addr):
     if is_exempt(email_addr):
         with get_conn() as conn:
             with conn.cursor() as cur:
-                cur.execute("""INSERT INTO users (email, credits, plan, updated_at) VALUES (%s, %s, %s, %s)
-                               ON CONFLICT(email) DO UPDATE SET credits=EXCLUDED.credits,
-                               plan=EXCLUDED.plan, updated_at=EXCLUDED.updated_at""",
+                cur.execute("""INSERT INTO users (email, credits, plan, updated_at)
+                               VALUES (%s, %s, %s, %s)
+                               ON CONFLICT(email) DO UPDATE
+                               SET credits=EXCLUDED.credits,
+                                   plan=EXCLUDED.plan,
+                                   updated_at=EXCLUDED.updated_at""",
                             (email_addr, EXEMPT_CREDITS, "exempt", datetime.utcnow().isoformat()))
             conn.commit()
-        return {"email": email_addr, "credits": EXEMPT_CREDITS, "plan": "exempt"}
+        return {"email": email_addr, "credits": EXEMPT_CREDITS, "plan": "exempt",
+                "consecutive_vip_months": 0, "custom_brand_logo_url": "", "custom_brand_contact": ""}
 
     with get_conn() as conn:
         with conn.cursor() as cur:
@@ -84,23 +112,30 @@ def get_or_create_user(email_addr):
             row = cur.fetchone()
             if row:
                 return dict(row)
-            cur.execute("INSERT INTO users (email, credits, plan, updated_at) VALUES (%s, %s, %s, %s)",
+            cur.execute("""INSERT INTO users (email, credits, plan, updated_at,
+                           consecutive_vip_months, custom_brand_logo_url, custom_brand_contact)
+                           VALUES (%s, %s, %s, %s, 0, '', '')""",
                         (email_addr, FREE_CREDITS, "free", datetime.utcnow().isoformat()))
-        conn.commit()
-    return {"email": email_addr, "credits": FREE_CREDITS, "plan": "free"}
+            conn.commit()
+    return {"email": email_addr, "credits": FREE_CREDITS, "plan": "free",
+            "consecutive_vip_months": 0, "custom_brand_logo_url": "", "custom_brand_contact": ""}
 
-def deduct_credit(email_addr):
+def calc_credits_cost(num_photos):
+    """credits_deducted = max(1, ceil(photos / 2))"""
+    return max(1, math.ceil(num_photos / 2))
+
+def deduct_credits(email_addr, amount):
     email_addr = email_addr.strip().lower()
     if is_exempt(email_addr):
         get_or_create_user(email_addr)
         return True
     user = get_or_create_user(email_addr)
-    if user["credits"] <= 0:
+    if user["credits"] < amount:
         return False
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute("UPDATE users SET credits=credits-1, updated_at=%s WHERE email=%s",
-                        (datetime.utcnow().isoformat(), email_addr))
+            cur.execute("UPDATE users SET credits=credits-%s, updated_at=%s WHERE email=%s",
+                        (amount, datetime.utcnow().isoformat(), email_addr))
         conn.commit()
     return True
 
@@ -114,14 +149,64 @@ def add_credits(email_addr, plan, amount):
             cur.execute("UPDATE users SET credits=credits+%s, plan=%s, updated_at=%s WHERE email=%s",
                         (amount, plan, datetime.utcnow().isoformat(), email_addr))
         conn.commit()
-        
+
+def handle_vip_renewal(email_addr):
+    """
+    Called when VIP subscription_renewed event arrives.
+    - Rolls over unused credits (cap 200)
+    - Tracks consecutive months
+    - Awards loyalty bonus on month 4+
+    """
+    email_addr = email_addr.strip().lower()
+    if is_exempt(email_addr):
+        return
+    user = get_or_create_user(email_addr)
+    current_credits    = user.get("credits", 0)
+    consecutive_months = user.get("consecutive_vip_months", 0) + 1
+
+    # Add 120 new credits then cap at 200
+    new_credits = min(current_credits + 120, VIP_MAX_CREDITS)
+
+    # Loyalty bonus on 4th month onward (every 3 consecutive)
+    bonus = 0
+    if consecutive_months % VIP_LOYALTY_MONTHS == 1 and consecutive_months > 1:
+        bonus = VIP_LOYALTY_BONUS
+        new_credits = min(new_credits + bonus, VIP_MAX_CREDITS)
+        log.info("VIP loyalty bonus +%d to %s (month %d)", bonus, email_addr, consecutive_months)
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE users
+                           SET credits=%s, plan='vip',
+                               consecutive_vip_months=%s, updated_at=%s
+                           WHERE email=%s""",
+                        (new_credits, consecutive_months, datetime.utcnow().isoformat(), email_addr))
+        conn.commit()
+    log.info("VIP renewal for %s: credits=%d (bonus=%d, month=%d)",
+             email_addr, new_credits, bonus, consecutive_months)
+
+def handle_vip_cancelled(email_addr):
+    """Forfeit all credits when VIP is cancelled/expired."""
+    email_addr = email_addr.strip().lower()
+    if is_exempt(email_addr):
+        return
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""UPDATE users
+                           SET credits=0, plan='free',
+                               consecutive_vip_months=0, updated_at=%s
+                           WHERE email=%s""",
+                        (datetime.utcnow().isoformat(), email_addr))
+        conn.commit()
+    log.info("VIP cancelled for %s — credits forfeited", email_addr)
+
 # ─── Init DB on startup ─────────────────────────────────────────────────────
 with app.app_context():
     try:
         init_db()
-        log.info("Turso DB initialized successfully")
+        log.info("DB initialized successfully")
     except Exception as e:
-        log.error("Turso DB init error: %s", e)
+        log.error("DB init error: %s", e)
 
 # ─── Image & AI Logic ───────────────────────────────────────────────────────
 def compress_image(image_bytes, max_size=(800, 800)):
@@ -137,28 +222,31 @@ def compress_image(image_bytes, max_size=(800, 800)):
         log.error("compress_image error: %s", e)
         return image_bytes
 
-def get_dynamic_prompt(subject, caption):
+def get_dynamic_prompt(subject, caption, num_images=1):
     combined = f"{subject} {caption}".lower()
-    base = """أنت خبير واخصائي فحص جودة المنتجات وتوثيق حالة السلع.
-قم بتحليل صورة المنتج والوصف بدقة وإصدار تقرير فحص احترافي.
+    multi_note = f"\nNote: The user has submitted {num_images} images of the same product from different angles. Analyze ALL images together for a comprehensive report.\n" if num_images > 1 else ""
+
+    base = f"""أنت خبير واخصائي فحص جودة المنتجات وتوثيق حالة السلع.
+قم بتحليل صورة/صور المنتج والوصف بدقة وإصدار تقرير فحص احترافي.
+{multi_note}
 يجب أن ترجع إجابتك ككائن JSON خام فقط (بدون markdown أو ```json):
-{
+{{
   "image_quality": "good|poor|unusable",
   "quality_note": "شرح مختصر جداً باللغة العربية إذا كانت الصورة غير واضحة، وإلا اتركها فارغة",
   "overall_score": 75,
   "verdict_title": "حالة جيدة مع ملاحظات طفيفة",
   "verdict_status": "success|warning|danger",
   "metrics": [
-    {"name": "النظافة وخلو السطح من العيوب", "score": 70},
-    {"name": "سلامة الهيكل والقماش/المعدن", "score": 80},
-    {"name": "التطابق مع وصف البائع", "score": 75}
+    {{"name": "النظافة وخلو السطح من العيوب", "score": 70}},
+    {{"name": "سلامة الهيكل والقماش/المعدن", "score": 80}},
+    {{"name": "التطابق مع وصف البائع", "score": 75}}
   ],
   "observations": [
-    {"type": "damage|discrepancy|note", "title": "عنوان الملاحظة", "description": "شرح مختصر ومباشر باللغة العربية"}
+    {{"type": "damage|discrepancy|note", "title": "عنوان الملاحظة", "description": "شرح مختصر ومباشر باللغة العربية"}}
   ],
   "summary_for_user": "توصية نهائية موجزة جداً (سطران كحد أقصى) توضح هل المنتج يستحق الشراء أم لا."
-}
-CRITICAL: 
+}}
+CRITICAL:
 1. جميع النصوص داخل JSON تكون باللغة العربية حصراً.
 2. التقييمات تكون واقعية وموزونة (بين 30% إلى 95%).
 3. حافظ على الاختصار الشديد والتركيز في الملاحظات."""
@@ -177,7 +265,7 @@ CRITICAL:
     user = f'\n\nSeller caption:\n"{caption}"' if caption else ""
     return base + cat + user
 
-def analyze_image(image_bytes, caption, subject):
+def analyze_images(images_bytes_list, caption, subject, is_vip=False):
     if not OPENROUTER_API_KEY:
         log.error("OPENROUTER_API_KEY is missing!")
         return {
@@ -191,35 +279,35 @@ def analyze_image(image_bytes, caption, subject):
             "summary_for_user": "تعذر إجراء الفحص بسبب خطأ في الإعدادات."
         }
 
-    compressed = compress_image(image_bytes)
-    b64        = base64.b64encode(compressed).decode()
-    prompt     = get_dynamic_prompt(subject, caption)
+    num_images = len(images_bytes_list)
+    prompt = get_dynamic_prompt(subject, caption, num_images)
+
+    # Build content array with all images
+    content = [{"type": "text", "text": prompt}]
+    for img_bytes in images_bytes_list:
+        compressed = compress_image(img_bytes)
+        b64 = base64.b64encode(compressed).decode()
+        content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
 
     payload = {
         "model": "google/gemini-2.5-pro",
         "temperature": 0.2,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
-                ]
-            }
-        ]
+        "messages": [{"role": "user", "content": content}]
     }
+
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": f"https://{SITE_URL}",
+        "X-Title": "AI Product Inspector",
+    }
+    if is_vip:
+        headers["X-Priority"] = "high"
 
     try:
         resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
-            json=payload,
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": f"https://{SITE_URL}",
-                "X-Title": "AI Product Inspector"
-            },
-            timeout=45
+            json=payload, headers=headers, timeout=60
         )
         resp.raise_for_status()
     except requests.RequestException as e:
@@ -248,8 +336,8 @@ def format_report_html(result):
     status = result.get("verdict_status", "warning")
     color_map = {
         "success": {"badge_bg": "rgba(34, 197, 94, 0.15)", "border": "#22c55e", "text": "#4ade80"},
-        "warning": {"badge_bg": "rgba(234, 179, 8, 0.15)", "border": "#eab308", "text": "#fde047"},
-        "danger":  {"badge_bg": "rgba(239, 68, 68, 0.15)", "border": "#ef4444", "text": "#fca5a5"}
+        "warning": {"badge_bg": "rgba(234, 179, 8, 0.15)",  "border": "#eab308", "text": "#fde047"},
+        "danger":  {"badge_bg": "rgba(239, 68, 68, 0.15)",  "border": "#ef4444", "text": "#fca5a5"}
     }
     theme = color_map.get(status, color_map["warning"])
 
@@ -257,11 +345,10 @@ def format_report_html(result):
         note = result.get("quality_note", "الصورة غير واضحة بشكل كافٍ.")
         return f"""
         <div dir="rtl" style="background:#0f172a; border:1px solid #334155; border-radius:12px; padding:20px; color:#f8fafc; font-family:system-ui,-apple-system,sans-serif; text-align:right;">
-            <div style="background:rgba(239, 68, 68, 0.15); border:1px solid #ef4444; border-radius:8px; padding:15px; color:#fca5a5; font-weight:600; text-align:center;">
+            <div style="background:rgba(239,68,68,0.15); border:1px solid #ef4444; border-radius:8px; padding:15px; color:#fca5a5; font-weight:600; text-align:center;">
                 ⚠️ تعذر الفحص الدقيق: {note}
             </div>
-        </div>
-        """
+        </div>"""
 
     metrics_html = ""
     for m in result.get("metrics", []):
@@ -269,35 +356,28 @@ def format_report_html(result):
         metrics_html += f"""
         <div style="margin-bottom:12px;">
             <div style="display:flex; justify-content:space-between; font-size:13px; color:#cbd5e1; margin-bottom:4px;">
-                <span>{m.get('name', 'معيار الفحص')}</span>
+                <span>{m.get('name','معيار الفحص')}</span>
                 <span style="font-weight:bold; color:#f8fafc;">{score}%</span>
             </div>
             <div style="background:#334155; height:6px; border-radius:3px; overflow:hidden;">
                 <div style="background:{theme['border']}; width:{score}%; height:100%; border-radius:3px;"></div>
             </div>
-        </div>
-        """
+        </div>"""
 
     icons = {
-        "damage": ("❌", "#ef4444"),
+        "damage":      ("❌", "#ef4444"),
         "discrepancy": ("⚠️", "#eab308"),
-        "note": ("💡", "#3b82f6")
+        "note":        ("💡", "#3b82f6"),
     }
-
     obs_html = ""
     for o in result.get("observations", []):
         o_type = o.get("type", "note")
         icon, o_color = icons.get(o_type, ("📌", "#94a3b8"))
         obs_html += f"""
         <div style="background:#1e293b; border-right:3px solid {o_color}; padding:10px 12px; border-radius:4px 8px 8px 4px; margin-bottom:8px;">
-            <div style="font-size:14px; font-weight:bold; color:#f8fafc; margin-bottom:2px;">
-                {icon} {o.get('title', 'ملاحظة')}
-            </div>
-            <div style="font-size:13px; color:#94a3b8; line-height:1.4;">
-                {o.get('description', '')}
-            </div>
-        </div>
-        """
+            <div style="font-size:14px; font-weight:bold; color:#f8fafc; margin-bottom:2px;">{icon} {o.get('title','ملاحظة')}</div>
+            <div style="font-size:13px; color:#94a3b8; line-height:1.4;">{o.get('description','')}</div>
+        </div>"""
 
     if not obs_html:
         obs_html = '<div style="font-size:13px; color:#94a3b8; text-align:center;">لم يتم تسجيل أي عيوب ظاهرة.</div>'
@@ -309,9 +389,7 @@ def format_report_html(result):
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:18px; margin-bottom:20px;">
             <div>
                 <span style="font-size:12px; font-weight:600; color:#94a3b8;">تقرير الفحص الذكي</span>
-                <h3 style="margin:4px 0 0 0; font-size:18px; color:{theme['text']}; font-weight:bold;">
-                    {result.get('verdict_title', 'نتيجة الفحص')}
-                </h3>
+                <h3 style="margin:4px 0 0 0; font-size:18px; color:{theme['text']}; font-weight:bold;">{result.get('verdict_title','نتيجة الفحص')}</h3>
             </div>
             <div style="background:{theme['badge_bg']}; border:1px solid {theme['border']}; border-radius:12px; padding:8px 16px; text-align:center;">
                 <div style="font-size:22px; font-weight:bold; color:{theme['text']}; line-height:1;">{score_val}<span style="font-size:13px; color:#94a3b8;">/100</span></div>
@@ -328,15 +406,12 @@ def format_report_html(result):
         </div>
         <div style="background:{theme['badge_bg']}; border:1px dashed {theme['border']}; border-radius:12px; padding:14px; margin-top:16px;">
             <div style="font-size:13px; font-weight:bold; color:{theme['text']}; margin-bottom:4px;">💡 التوصية النهائية:</div>
-            <div style="font-size:13px; color:#e2e8f0; line-height:1.5;">
-                {result.get('summary_for_user', '')}
-            </div>
+            <div style="font-size:13px; color:#e2e8f0; line-height:1.5;">{result.get('summary_for_user','')}</div>
         </div>
         <div style="font-size:10px; color:#64748b; text-align:center; margin-top:16px; border-top:1px solid #1e293b; padding-top:10px;">
             تحليل استرشادي آلي — القرار النهائي يعود إليك.
         </div>
-    </div>
-    """
+    </div>"""
 
 def send_reply(to_address, subject, html_body):
     if not RESEND_API_KEY:
@@ -344,12 +419,10 @@ def send_reply(to_address, subject, html_body):
     try:
         resp = requests.post(
             "https://api.resend.com/emails",
-            json={
-                "from": f"AI Product Inspector <{FROM_ADDRESS}>",
-                "to": [to_address],
-                "subject": f"تقرير فحص منتجك: Re: {subject}",
-                "html": html_body
-            },
+            json={"from": f"AI Product Inspector <{FROM_ADDRESS}>",
+                  "to": [to_address],
+                  "subject": f"تقرير فحص منتجك: Re: {subject}",
+                  "html": html_body},
             headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
             timeout=20
         )
@@ -364,12 +437,10 @@ def forward_to_admin(sender, subject, body):
     try:
         requests.post(
             "https://api.resend.com/emails",
-            json={
-                "from": f"AI Inspector Bot <{FROM_ADDRESS}>",
-                "to": [ADMIN_EMAIL],
-                "subject": f"[دعم فني] من {sender}: {subject}",
-                "text": f"المرسل: {sender}\n\n{body}"
-            },
+            json={"from": f"AI Inspector Bot <{FROM_ADDRESS}>",
+                  "to": [ADMIN_EMAIL],
+                  "subject": f"[دعم فني] من {sender}: {subject}",
+                  "text": f"المرسل: {sender}\n\n{body}"},
             headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
             timeout=20
         )
@@ -383,10 +454,8 @@ def fetch_image_from_resend(email_id, attachments_meta):
         if not att_id or not att.get("content_type", "").startswith("image/"):
             continue
         try:
-            r = requests.get(
-                f"https://api.resend.com/emails/receiving/{email_id}/attachments/{att_id}",
-                headers=headers, timeout=15
-            )
+            r = requests.get(f"https://api.resend.com/emails/receiving/{email_id}/attachments/{att_id}",
+                             headers=headers, timeout=15)
             if r.status_code != 200:
                 continue
             dl = r.json().get("download_url")
@@ -410,29 +479,50 @@ def credits_check():
     if not email_addr:
         return jsonify({"error": "email required"}), 400
     user = get_or_create_user(email_addr)
-    return jsonify({"credits": user["credits"], "plan": user["plan"]})
+    plan = user["plan"]
+    photo_limit = PLAN_PHOTO_LIMITS.get(plan, 1)
+    return jsonify({"credits": user["credits"], "plan": plan, "photo_limit": photo_limit})
 
 @app.route("/upload", methods=["POST"])
 def direct_upload():
     email_addr  = request.form.get("email", "").strip().lower()
     description = request.form.get("description", "")
-    image_file  = request.files.get("image")
+    image_files = request.files.getlist("image")
 
     if not email_addr:
         return jsonify({"error": "البريد الإلكتروني مطلوب"}), 400
-    if not image_file:
+    if not image_files or all(f.filename == "" for f in image_files):
         return jsonify({"error": "لم يتم رفع أي صورة"}), 400
 
-    if not deduct_credit(email_addr):
+    user        = get_or_create_user(email_addr)
+    plan        = user["plan"]
+    photo_limit = PLAN_PHOTO_LIMITS.get(plan, 1)
+    is_vip      = (plan == "vip")
+
+    # Filter valid files
+    valid_files = [f for f in image_files if f and f.filename != ""]
+
+    # Enforce plan photo limit
+    if len(valid_files) > photo_limit:
+        return jsonify({"error": f"باقتك تسمح بـ {photo_limit} صورة كحد أقصى لكل فحص"}), 400
+
+    # Calculate credit cost
+    cost = calc_credits_cost(len(valid_files))
+
+    # Deduct credits
+    if not deduct_credits(email_addr, cost):
         return jsonify({"error": "نفد رصيدك", "credits": 0}), 402
 
     try:
-        result = analyze_image(image_file.read(), description, description)
+        images_bytes = [f.read() for f in valid_files]
+        result = analyze_images(images_bytes, description, description, is_vip=is_vip)
         user   = get_or_create_user(email_addr)
         return jsonify({
-            "status": "success",
-            "report": format_report_html(result),
-            "credits": user["credits"]
+            "status":  "success",
+            "report":  format_report_html(result),
+            "credits": user["credits"],
+            "plan":    plan,
+            "cost":    cost,
         })
     except Exception as e:
         log.exception("Upload analysis error")
@@ -441,14 +531,13 @@ def direct_upload():
 @app.route("/webhook", methods=["POST"])
 def resend_webhook():
     try:
-        event = request.get_json(force=True, silent=True) or {}
-        data  = event.get("data", event)
+        event    = request.get_json(force=True, silent=True) or {}
+        data     = event.get("data", event)
         email_id = data.get("email_id") or data.get("id")
 
         raw_from = data.get("from", "")
         if isinstance(raw_from, list) and raw_from:
             raw_from = raw_from[0]
-
         _, sender = email.utils.parseaddr(str(raw_from))
         if not sender:
             sender = str(raw_from)
@@ -459,10 +548,8 @@ def resend_webhook():
 
         if email_id and RESEND_API_KEY:
             headers   = {"Authorization": f"Bearer {RESEND_API_KEY}"}
-            body_resp = requests.get(
-                f"https://api.resend.com/emails/receiving/{email_id}",
-                headers=headers, timeout=15
-            )
+            body_resp = requests.get(f"https://api.resend.com/emails/receiving/{email_id}",
+                                     headers=headers, timeout=15)
             if body_resp.status_code == 200:
                 bd = body_resp.json()
                 caption = bd.get("text") or bd.get("html") or ""
@@ -471,7 +558,7 @@ def resend_webhook():
 
         if image_bytes and sender:
             log.info("Analyzing inbound email from %s", sender)
-            result = analyze_image(image_bytes, caption, subject)
+            result = analyze_images([image_bytes], caption, subject)
             send_reply(sender, subject, format_report_html(result))
             return jsonify({"status": "success"}), 200
 
@@ -499,38 +586,50 @@ def lemonsqueezy_webhook():
     try:
         payload    = request.get_json(force=True) or {}
         event_name = payload.get("meta", {}).get("event_name", "")
-
-        if event_name != "order_created":
-            return jsonify({"status": "ignored", "event": event_name}), 200
-
-        attrs          = payload.get("data", {}).get("attributes", {})
+        attrs      = payload.get("data", {}).get("attributes", {})
         customer_email = attrs.get("user_email", "").strip().lower()
 
         if not customer_email:
             log.error("LemonSqueezy: no customer email in payload")
             return jsonify({"error": "no email"}), 400
 
-        variant_id = None
-        for item in payload.get("included", []):
-            if item.get("type") == "order-items":
-                raw_vid    = item.get("attributes", {}).get("variant_id", "")
-                variant_id = str(raw_vid).strip()
-                break
+        # ── New order ──────────────────────────────────────────────────────
+        if event_name == "order_created":
+            variant_id = None
+            for item in payload.get("included", []):
+                if item.get("type") == "order-items":
+                    raw_vid    = item.get("attributes", {}).get("variant_id", "")
+                    variant_id = str(raw_vid).strip()
+                    break
 
-        if not variant_id:
-            log.error("LemonSqueezy: variant_id not found in payload")
-            return jsonify({"status": "no_variant"}), 200
+            if not variant_id:
+                log.error("LemonSqueezy: variant_id not found")
+                return jsonify({"status": "no_variant"}), 200
 
-        plan_info = PLAN_CREDITS.get(variant_id)
-        if not plan_info:
-            log.warning("LemonSqueezy: unknown variant_id=%s", variant_id)
-            return jsonify({"status": "unknown_plan", "variant_id": variant_id}), 200
+            plan_info = PLAN_CREDITS.get(variant_id)
+            if not plan_info:
+                log.warning("LemonSqueezy: unknown variant_id=%s", variant_id)
+                return jsonify({"status": "unknown_plan", "variant_id": variant_id}), 200
 
-        plan_name, credits = plan_info
-        add_credits(customer_email, plan_name, credits)
-        log.info("Granted %d credits (%s) to %s via variant %s",
-                 credits, plan_name, customer_email, variant_id)
-        return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
+            plan_name, credits = plan_info
+            add_credits(customer_email, plan_name, credits)
+            log.info("Granted %d credits (%s) to %s via variant %s",
+                     credits, plan_name, customer_email, variant_id)
+            return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
+
+        # ── VIP subscription renewed ────────────────────────────────────────
+        elif event_name == "subscription_renewed":
+            handle_vip_renewal(customer_email)
+            return jsonify({"status": "renewed"}), 200
+
+        # ── VIP subscription cancelled or expired ───────────────────────────
+        elif event_name in ("subscription_cancelled", "subscription_expired",
+                            "subscription_payment_failed"):
+            handle_vip_cancelled(customer_email)
+            return jsonify({"status": "cancelled"}), 200
+
+        else:
+            return jsonify({"status": "ignored", "event": event_name}), 200
 
     except Exception as e:
         log.exception("LemonSqueezy webhook error")
