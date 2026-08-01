@@ -31,9 +31,7 @@ SITE_URL            = "editchecker.com"
 FREE_CREDITS        = 3
 DATABASE_URL        = os.environ.get("DATABASE_URL", "")
 
-# ─── Exempt emails: bypass payment, always VIP, 999 credits ────────────────
-# These accounts NEVER have credits deducted, always get 4-photo limit,
-# and are automatically set to plan="exempt" (treated same as VIP).
+# ─── Exempt emails ─────────────────────────────────────────────────────────
 EXEMPT_CREDITS = 999
 EXEMPT_EMAILS = {
     "akashiiso04@gmail.com",
@@ -41,7 +39,7 @@ EXEMPT_EMAILS = {
     "mohammdlghmd@gmail.com",
 }
 
-# ─── LemonSqueezy Variant IDs → (plan_name, credits) ───────────────────────
+# ─── LemonSqueezy Variant IDs ───────────────────────────────────────────────
 PLAN_CREDITS = {
     "1962077": ("basic", 10),
     "1962093": ("pro",   50),
@@ -54,7 +52,7 @@ PLAN_PHOTO_LIMITS = {
     "basic":  1,
     "pro":    2,
     "vip":    4,
-    "exempt": 4,   # exempt = full VIP privileges
+    "exempt": 4,
 }
 
 VIP_MAX_CREDITS    = 200
@@ -77,7 +75,6 @@ def init_db():
                 custom_brand_logo_url TEXT DEFAULT '',
                 custom_brand_contact TEXT DEFAULT ''
             )""")
-            # Add new columns if upgrading from old schema
             for col, definition in [
                 ("consecutive_vip_months", "INTEGER DEFAULT 0"),
                 ("custom_brand_logo_url",  "TEXT DEFAULT ''"),
@@ -90,13 +87,10 @@ def init_db():
         conn.commit()
 
 def is_exempt(email_addr):
-    """Returns True if this email has permanent VIP/exempt status."""
     return email_addr.strip().lower() in EXEMPT_EMAILS
 
 def get_or_create_user(email_addr):
     email_addr = email_addr.strip().lower()
-
-    # ── Exempt accounts: always force plan=exempt, credits=999 ──
     if is_exempt(email_addr):
         with get_conn() as conn:
             with conn.cursor() as cur:
@@ -111,45 +105,32 @@ def get_or_create_user(email_addr):
                 """, (email_addr, EXEMPT_CREDITS, "exempt", datetime.utcnow().isoformat()))
             conn.commit()
         return {
-            "email": email_addr,
-            "credits": EXEMPT_CREDITS,
-            "plan": "exempt",
-            "consecutive_vip_months": 0,
-            "custom_brand_logo_url": "",
-            "custom_brand_contact": "",
+            "email": email_addr, "credits": EXEMPT_CREDITS, "plan": "exempt",
+            "consecutive_vip_months": 0, "custom_brand_logo_url": "", "custom_brand_contact": "",
         }
 
-    # ── Regular accounts ──
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM users WHERE email=%s", (email_addr,))
             row = cur.fetchone()
             if row:
                 return dict(row)
-            # New user: 3 free credits
             cur.execute("""
                 INSERT INTO users (email, credits, plan, updated_at,
                                    consecutive_vip_months, custom_brand_logo_url, custom_brand_contact)
                 VALUES (%s, %s, %s, %s, 0, '', '')
             """, (email_addr, FREE_CREDITS, "free", datetime.utcnow().isoformat()))
             conn.commit()
-
     return {
-        "email": email_addr,
-        "credits": FREE_CREDITS,
-        "plan": "free",
-        "consecutive_vip_months": 0,
-        "custom_brand_logo_url": "",
-        "custom_brand_contact": "",
+        "email": email_addr, "credits": FREE_CREDITS, "plan": "free",
+        "consecutive_vip_months": 0, "custom_brand_logo_url": "", "custom_brand_contact": "",
     }
 
 def calc_credits_cost(num_photos):
-    """Cost = max(1, ceil(photos / 2)).  Exempt accounts always pay 0."""
     return max(1, math.ceil(num_photos / 2))
 
 def deduct_credits(email_addr, amount):
     email_addr = email_addr.strip().lower()
-    # Exempt accounts: never deduct — just make sure user exists
     if is_exempt(email_addr):
         get_or_create_user(email_addr)
         return True
@@ -168,7 +149,6 @@ def deduct_credits(email_addr, amount):
 def add_credits(email_addr, plan, amount):
     email_addr = email_addr.strip().lower()
     get_or_create_user(email_addr)
-    # Exempt accounts don't need purchased credits stacked on top
     if is_exempt(email_addr):
         return
     with get_conn() as conn:
@@ -180,46 +160,37 @@ def add_credits(email_addr, plan, amount):
         conn.commit()
 
 def handle_vip_renewal(email_addr):
-    """VIP subscription_renewed: roll over unused credits (cap 200), track months, award loyalty bonus."""
     email_addr = email_addr.strip().lower()
     if is_exempt(email_addr):
         return
     user = get_or_create_user(email_addr)
     current_credits    = user.get("credits", 0)
     consecutive_months = user.get("consecutive_vip_months", 0) + 1
-
     new_credits = min(current_credits + 120, VIP_MAX_CREDITS)
-
     bonus = 0
     if consecutive_months % VIP_LOYALTY_MONTHS == 1 and consecutive_months > 1:
         bonus = VIP_LOYALTY_BONUS
         new_credits = min(new_credits + bonus, VIP_MAX_CREDITS)
         log.info("VIP loyalty bonus +%d to %s (month %d)", bonus, email_addr, consecutive_months)
-
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                UPDATE users
-                SET credits=%s, plan='vip',
-                    consecutive_vip_months=%s, updated_at=%s
-                WHERE email=%s
+                UPDATE users SET credits=%s, plan='vip',
+                    consecutive_vip_months=%s, updated_at=%s WHERE email=%s
             """, (new_credits, consecutive_months, datetime.utcnow().isoformat(), email_addr))
         conn.commit()
     log.info("VIP renewal for %s: credits=%d (bonus=%d, month=%d)",
              email_addr, new_credits, bonus, consecutive_months)
 
 def handle_vip_cancelled(email_addr):
-    """Forfeit all credits when VIP is cancelled/expired."""
     email_addr = email_addr.strip().lower()
     if is_exempt(email_addr):
         return
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                UPDATE users
-                SET credits=0, plan='free',
-                    consecutive_vip_months=0, updated_at=%s
-                WHERE email=%s
+                UPDATE users SET credits=0, plan='free',
+                    consecutive_vip_months=0, updated_at=%s WHERE email=%s
             """, (datetime.utcnow().isoformat(), email_addr))
         conn.commit()
     log.info("VIP cancelled for %s — credits forfeited", email_addr)
@@ -296,13 +267,9 @@ def analyze_images(images_bytes_list, caption, subject, is_vip=False):
     if not OPENROUTER_API_KEY:
         log.error("OPENROUTER_API_KEY is missing!")
         return {
-            "image_quality": "unusable",
-            "quality_note": "مفتاح التشغيل غير متوفر.",
-            "overall_score": 0,
-            "verdict_title": "خطأ إعدادات",
-            "verdict_status": "danger",
-            "metrics": [],
-            "observations": [],
+            "image_quality": "unusable", "quality_note": "مفتاح التشغيل غير متوفر.",
+            "overall_score": 0, "verdict_title": "خطأ إعدادات", "verdict_status": "danger",
+            "metrics": [], "observations": [],
             "summary_for_user": "تعذر إجراء الفحص بسبب خطأ في الإعدادات.",
         }
 
@@ -346,17 +313,17 @@ def analyze_images(images_bytes_list, caption, subject, is_vip=False):
     except json.JSONDecodeError:
         log.error("JSON parse error: %s", raw)
         return {
-            "image_quality": "unusable",
-            "quality_note": "تعذر تحليل الاستجابة.",
-            "overall_score": 50,
-            "verdict_title": "تحليل غير مكتمل",
-            "verdict_status": "warning",
-            "metrics": [],
-            "observations": [],
+            "image_quality": "unusable", "quality_note": "تعذر تحليل الاستجابة.",
+            "overall_score": 50, "verdict_title": "تحليل غير مكتمل", "verdict_status": "warning",
+            "metrics": [], "observations": [],
             "summary_for_user": "حدث خطأ أثناء المعالجة. يُرجى إعادة المحاولة.",
         }
 
-def format_report_html(result):
+def format_report_html(result, images_b64_list=None, custom_logo_b64=None):
+    """
+    images_b64_list : list of base64 strings of uploaded product images
+    custom_logo_b64 : base64 string of VIP custom brand logo (optional)
+    """
     status    = result.get("verdict_status", "warning")
     color_map = {
         "success": {"badge_bg": "rgba(34,197,94,0.15)",  "border": "#22c55e", "text": "#4ade80"},
@@ -374,6 +341,31 @@ def format_report_html(result):
                padding:15px;color:#fca5a5;font-weight:600;text-align:center;">
             ⚠️ تعذر الفحص الدقيق: {note}
           </div>
+        </div>"""
+
+    # ── Custom brand logo (VIP white-label) ──
+    brand_html = ""
+    if custom_logo_b64:
+        brand_html = f"""
+        <div style="text-align:center;margin-bottom:16px;padding:12px;
+             background:#1e293b;border-radius:10px;border:1px solid #334155;">
+          <img src="data:image/png;base64,{custom_logo_b64}"
+               style="max-height:60px;max-width:200px;object-fit:contain;" alt="شعار المتجر">
+        </div>"""
+
+    # ── Uploaded product images strip ──
+    images_html = ""
+    if images_b64_list:
+        imgs = "".join(
+            f'<img src="data:image/jpeg;base64,{b64}" '
+            f'style="height:120px;width:auto;border-radius:8px;border:1px solid #334155;object-fit:cover;" '
+            f'alt="صورة المنتج">'
+            for b64 in images_b64_list
+        )
+        images_html = f"""
+        <div style="margin-bottom:16px;">
+          <div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">📷 صور المنتج المفحوص:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">{imgs}</div>
         </div>"""
 
     metrics_html = ""
@@ -397,8 +389,8 @@ def format_report_html(result):
     }
     obs_html = ""
     for o in result.get("observations", []):
-        o_type    = o.get("type", "note")
-        icon, oc  = icons.get(o_type, ("📌", "#94a3b8"))
+        o_type   = o.get("type", "note")
+        icon, oc = icons.get(o_type, ("📌", "#94a3b8"))
         obs_html += f"""
         <div style="background:#1e293b;border-right:3px solid {oc};padding:10px 12px;
              border-radius:4px 8px 8px 4px;margin-bottom:8px;">
@@ -415,6 +407,8 @@ def format_report_html(result):
     <div dir="rtl" style="background:#0f172a;border:1px solid #1e293b;border-radius:16px;padding:24px;
          color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;max-width:650px;margin:auto;
          text-align:right;box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+      {brand_html}
+      {images_html}
       <div style="display:flex;justify-content:space-between;align-items:center;
            border-bottom:1px solid #1e293b;padding-bottom:18px;margin-bottom:20px;">
         <div>
@@ -456,10 +450,10 @@ def send_reply(to_address, subject, html_body):
     try:
         resp = requests.post(
             "https://api.resend.com/emails",
-            json={"from":    f"AI Product Inspector <{FROM_ADDRESS}>",
-                  "to":      [to_address],
+            json={"from": f"AI Product Inspector <{FROM_ADDRESS}>",
+                  "to": [to_address],
                   "subject": f"تقرير فحص منتجك: Re: {subject}",
-                  "html":    html_body},
+                  "html": html_body},
             headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
             timeout=20,
         )
@@ -474,10 +468,10 @@ def forward_to_admin(sender, subject, body):
     try:
         requests.post(
             "https://api.resend.com/emails",
-            json={"from":    f"AI Inspector Bot <{FROM_ADDRESS}>",
-                  "to":      [ADMIN_EMAIL],
+            json={"from": f"AI Inspector Bot <{FROM_ADDRESS}>",
+                  "to": [ADMIN_EMAIL],
                   "subject": f"[دعم فني] من {sender}: {subject}",
-                  "text":    f"المرسل: {sender}\n\n{body}"},
+                  "text": f"المرسل: {sender}\n\n{body}"},
             headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
             timeout=20,
         )
@@ -520,7 +514,13 @@ def credits_check():
     user        = get_or_create_user(email_addr)
     plan        = user["plan"]
     photo_limit = PLAN_PHOTO_LIMITS.get(plan, 1)
-    return jsonify({"credits": user["credits"], "plan": plan, "photo_limit": photo_limit})
+    exempt      = is_exempt(email_addr)
+    return jsonify({
+        "credits":     user["credits"],
+        "plan":        plan,
+        "photo_limit": photo_limit,
+        "is_exempt":   exempt,
+    })
 
 @app.route("/upload", methods=["POST"])
 def direct_upload():
@@ -537,29 +537,108 @@ def direct_upload():
     plan        = user["plan"]
     photo_limit = PLAN_PHOTO_LIMITS.get(plan, 1)
     is_vip      = plan in ("vip", "exempt")
+    exempt      = is_exempt(email_addr)
 
     valid_files = [f for f in image_files if f and f.filename != ""]
     if len(valid_files) > photo_limit:
         return jsonify({"error": f"باقتك تسمح بـ {photo_limit} صورة كحد أقصى لكل فحص"}), 400
 
-    cost = calc_credits_cost(len(valid_files))
-    if not deduct_credits(email_addr, cost):
-        return jsonify({"error": "نفد رصيدك", "credits": 0}), 402
+    cost = 0 if exempt else calc_credits_cost(len(valid_files))
+
+    if not exempt:
+        if not deduct_credits(email_addr, cost):
+            return jsonify({"error": "نفد رصيدك", "credits": 0}), 402
 
     try:
         images_bytes = [f.read() for f in valid_files]
-        result       = analyze_images(images_bytes, description, description, is_vip=is_vip)
-        user         = get_or_create_user(email_addr)
+
+        # ── Compress & base64-encode product images for embedding in report ──
+        images_b64 = []
+        for raw in images_bytes:
+            compressed = compress_image(raw)
+            images_b64.append(base64.b64encode(compressed).decode())
+
+        # ── Custom brand logo (optional, VIP/Pro feature) ──
+        custom_logo_b64 = None
+        logo_file = request.files.get("custom_logo")
+        if logo_file and logo_file.filename:
+            logo_bytes      = logo_file.read()
+            # Compress logo
+            try:
+                logo_img = Image.open(io.BytesIO(logo_bytes))
+                if logo_img.mode in ("RGBA", "P"):
+                    logo_img = logo_img.convert("RGBA")
+                logo_img.thumbnail((300, 120), Image.Resampling.LANCZOS)
+                out = io.BytesIO()
+                logo_img.save(out, format="PNG")
+                custom_logo_b64 = base64.b64encode(out.getvalue()).decode()
+            except Exception:
+                custom_logo_b64 = base64.b64encode(logo_bytes).decode()
+
+        result = analyze_images(images_bytes, description, description, is_vip=is_vip)
+        user   = get_or_create_user(email_addr)
+
+        report_html = format_report_html(
+            result,
+            images_b64_list=images_b64,
+            custom_logo_b64=custom_logo_b64,
+        )
+
         return jsonify({
-            "status":  "success",
-            "report":  format_report_html(result),
-            "credits": user["credits"],
-            "plan":    plan,
-            "cost":    cost,
+            "status":          "success",
+            "report":          report_html,
+            "credits":         user["credits"],
+            "plan":            plan,
+            "cost":            cost,
+            "is_exempt":       exempt,
+            "custom_logo_b64": custom_logo_b64 or "",
+            "images_b64":      images_b64,
         })
     except Exception as e:
         log.exception("Upload analysis error")
         return jsonify({"error": str(e)}), 500
+
+@app.route("/webhook", methods=["POST"])
+def resend_webhook():
+    try:
+        event    = request.get_json(force=True, silent=True) or {}
+        data     = event.get("data", event)
+        email_id = data.get("email_id") or data.get("id")
+
+        raw_from = data.get("from", "")
+        if isinstance(raw_from, list) and raw_from:
+            raw_from = raw_from[0]
+        _, sender = email.utils.parseaddr(str(raw_from))
+        if not sender:
+            sender = str(raw_from)
+
+        subject          = data.get("subject", "")
+        attachments_meta = data.get("attachments", [])
+        caption          = ""
+
+        if email_id and RESEND_API_KEY:
+            headers   = {"Authorization": f"Bearer {RESEND_API_KEY}"}
+            body_resp = requests.get(f"https://api.resend.com/emails/receiving/{email_id}",
+                                     headers=headers, timeout=15)
+            if body_resp.status_code == 200:
+                bd = body_resp.json()
+                caption = bd.get("text") or bd.get("html") or ""
+
+        image_bytes = fetch_image_from_resend(email_id, attachments_meta) if email_id else None
+
+        if image_bytes and sender:
+            log.info("Analyzing inbound email from %s", sender)
+            result = analyze_images([image_bytes], caption, subject)
+            send_reply(sender, subject, format_report_html(result))
+            return jsonify({"status": "success"}), 200
+
+        if sender and caption:
+            forward_to_admin(sender, subject, caption)
+
+        return jsonify({"status": "ignored"}), 200
+    except Exception as e:
+        log.exception("Resend webhook error")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/lemonsqueezy/webhook", methods=["POST"])
 def lemonsqueezy_webhook():
@@ -584,7 +663,6 @@ def lemonsqueezy_webhook():
             log.error("LemonSqueezy: no customer email in payload")
             return jsonify({"error": "no email"}), 400
 
-        # ── New purchase ──
         if event_name == "order_created":
             variant_id = None
             for item in payload.get("included", []):
@@ -604,12 +682,10 @@ def lemonsqueezy_webhook():
                      credits, plan_name, customer_email, variant_id)
             return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
 
-        # ── VIP renewal ──
         elif event_name == "subscription_renewed":
             handle_vip_renewal(customer_email)
             return jsonify({"status": "renewed"}), 200
 
-        # ── VIP cancellation / expiry ──
         elif event_name in ("subscription_cancelled", "subscription_expired",
                             "subscription_payment_failed"):
             handle_vip_cancelled(customer_email)
