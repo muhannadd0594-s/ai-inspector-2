@@ -487,10 +487,14 @@ def credits_check():
 def direct_upload():
     email_addr  = request.form.get("email", "").strip().lower()
     description = request.form.get("description", "")
-    image_files = request.files.getlist("image")
+    
+    # ── التعديل هنا: تم تغيير image إلى images ──
+    image_files = request.files.getlist("images")
 
     if not email_addr:
         return jsonify({"error": "البريد الإلكتروني مطلوب"}), 400
+    
+    # التأكد من وجود ملفات فعلية
     if not image_files or all(f.filename == "" for f in image_files):
         return jsonify({"error": "لم يتم رفع أي صورة"}), 400
 
@@ -499,17 +503,17 @@ def direct_upload():
     photo_limit = PLAN_PHOTO_LIMITS.get(plan, 1)
     is_vip      = (plan == "vip")
 
-    # Filter valid files
+    # فلترة الملفات الصالحة فقط
     valid_files = [f for f in image_files if f and f.filename != ""]
 
-    # Enforce plan photo limit
+    # تطبيق قيود عدد الصور حسب الباقة
     if len(valid_files) > photo_limit:
         return jsonify({"error": f"باقتك تسمح بـ {photo_limit} صورة كحد أقصى لكل فحص"}), 400
 
-    # Calculate credit cost
+    # حساب التكلفة (كل صورتين = فحص واحد)
     cost = calc_credits_cost(len(valid_files))
 
-    # Deduct credits
+    # خصم الرصيد
     if not deduct_credits(email_addr, cost):
         return jsonify({"error": "نفد رصيدك", "credits": 0}), 402
 
@@ -517,6 +521,7 @@ def direct_upload():
         images_bytes = [f.read() for f in valid_files]
         result = analyze_images(images_bytes, description, description, is_vip=is_vip)
         user   = get_or_create_user(email_addr)
+        
         return jsonify({
             "status":  "success",
             "report":  format_report_html(result),
@@ -528,47 +533,7 @@ def direct_upload():
         log.exception("Upload analysis error")
         return jsonify({"error": str(e)}), 500
 
-@app.route("/webhook", methods=["POST"])
-def resend_webhook():
-    try:
-        event    = request.get_json(force=True, silent=True) or {}
-        data     = event.get("data", event)
-        email_id = data.get("email_id") or data.get("id")
-
-        raw_from = data.get("from", "")
-        if isinstance(raw_from, list) and raw_from:
-            raw_from = raw_from[0]
-        _, sender = email.utils.parseaddr(str(raw_from))
-        if not sender:
-            sender = str(raw_from)
-
-        subject          = data.get("subject", "")
-        attachments_meta = data.get("attachments", [])
-        caption          = ""
-
-        if email_id and RESEND_API_KEY:
-            headers   = {"Authorization": f"Bearer {RESEND_API_KEY}"}
-            body_resp = requests.get(f"https://api.resend.com/emails/receiving/{email_id}",
-                                     headers=headers, timeout=15)
-            if body_resp.status_code == 200:
-                bd = body_resp.json()
-                caption = bd.get("text") or bd.get("html") or ""
-
-        image_bytes = fetch_image_from_resend(email_id, attachments_meta) if email_id else None
-
-        if image_bytes and sender:
-            log.info("Analyzing inbound email from %s", sender)
-            result = analyze_images([image_bytes], caption, subject)
-            send_reply(sender, subject, format_report_html(result))
-            return jsonify({"status": "success"}), 200
-
-        if sender and caption:
-            forward_to_admin(sender, subject, caption)
-
-        return jsonify({"status": "ignored"}), 200
-    except Exception as e:
-        log.exception("Resend webhook error")
-        return jsonify({"status": "error", "message": str(e)}), 500
+# ── تم حذف مسار webhook الخاص بـ Resend لتنظيف النظام ──
 
 @app.route("/lemonsqueezy/webhook", methods=["POST"])
 def lemonsqueezy_webhook():
@@ -593,7 +558,7 @@ def lemonsqueezy_webhook():
             log.error("LemonSqueezy: no customer email in payload")
             return jsonify({"error": "no email"}), 400
 
-        # ── New order ──────────────────────────────────────────────────────
+        # ── طلب جديد (شراء باقة) ──
         if event_name == "order_created":
             variant_id = None
             for item in payload.get("included", []):
@@ -617,12 +582,12 @@ def lemonsqueezy_webhook():
                      credits, plan_name, customer_email, variant_id)
             return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
 
-        # ── VIP subscription renewed ────────────────────────────────────────
+        # ── تجديد اشتراك VIP ──
         elif event_name == "subscription_renewed":
             handle_vip_renewal(customer_email)
             return jsonify({"status": "renewed"}), 200
 
-        # ── VIP subscription cancelled or expired ───────────────────────────
+        # ── إلغاء أو انتهاء اشتراك VIP ──
         elif event_name in ("subscription_cancelled", "subscription_expired",
                             "subscription_payment_failed"):
             handle_vip_cancelled(customer_email)
