@@ -61,6 +61,7 @@
 
 <!-- ─── Hidden logo data for PDF ─── -->
 <span id="logo-b64-store">ضع_كود_Base64_الخاص_بالشعار_هنا</span>
+
 <!-- ════════════════════════════════════════════
      MODALS
 ════════════════════════════════════════════ -->
@@ -210,7 +211,7 @@
     <span class="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">بدقة الخبراء وفي ثوانٍ</span>
   </h1>
   <p class="text-lg text-slate-400 max-w-2xl mx-auto mb-10">
-    ارفع صورة المنتج مع وصف قصير، وسيرسل نظامنا تقريراً تشخيصياً احترافياً فورياً.
+    ارفع صور المنتج مع وصف قصير، وسيرسل نظامنا تقريراً تشخيصياً احترافياً فورياً.
   </p>
 
   <!-- Upload Form -->
@@ -230,9 +231,13 @@
     </div>
 
     <div class="mb-4">
-      <label class="text-sm text-slate-400 block mb-1">صورة المنتج <span class="text-emerald-400">*</span></label>
+      <div class="flex justify-between items-end mb-1">
+        <label class="text-sm text-slate-400 block">صور المنتج <span class="text-emerald-400">*</span></label>
+        <span id="photo-limit-msg" class="text-xs text-slate-500">الحد الأقصى للصور: 1</span>
+      </div>
       <input id="upload-image" type="file" accept="image/*"
              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-500 file:text-slate-950 cursor-pointer">
+      <div id="cost-preview" class="hidden mt-2 text-xs font-semibold text-emerald-400"></div>
     </div>
 
     <button id="upload-btn" onclick="submitUpload()"
@@ -272,18 +277,18 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
       <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800">
         <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">1</div>
-        <h3 class="text-xl font-bold text-white mb-3">ارفع الصورة</h3>
-        <p class="text-slate-400 text-sm leading-relaxed">ارفع صورة المنتج مباشرة من الموقع لبدء عملية الفحص والتحليل الفوري.</p>
+        <h3 class="text-xl font-bold text-white mb-3">ارفع الصور</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">ارفع صور المنتج مباشرة من الموقع لبدء عملية الفحص والتحليل الفوري (حسب باقتك).</p>
       </div>
       <div class="bg-slate-900 p-8 rounded-2xl border border-emerald-500/30 shadow-lg shadow-emerald-500/10">
         <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">2</div>
         <h3 class="text-xl font-bold text-white mb-3">تحليل بصري دقيق</h3>
-        <p class="text-slate-400 text-sm leading-relaxed">يمسح النظام الصورة بحثاً عن الخدوش والتلفيات وأي تعارض مع وصف البائع</p>
+        <p class="text-slate-400 text-sm leading-relaxed">يمسح النظام الصور بحثاً عن الخدوش والتلفيات وأي تعارض مع وصف البائع.</p>
       </div>
       <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800">
         <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">3</div>
         <h3 class="text-xl font-bold text-white mb-3">تقرير فوري</h3>
-        <p class="text-slate-400 text-sm leading-relaxed">خلال 15 ثانية تستلم تقريراً تفصيلياً باللغة العربية يوضح حالة المنتج والتوصية النهائية</p>
+        <p class="text-slate-400 text-sm leading-relaxed">خلال ثوانٍ تستلم تقريراً تفصيلياً باللغة العربية يوضح حالة المنتج والتوصية النهائية.</p>
       </div>
     </div>
   </div>
@@ -365,8 +370,8 @@
         <div class="text-3xl font-extrabold text-white mb-6">مجاناً</div>
         <ul class="space-y-2 text-sm text-slate-300 mb-8">
           <li>✓ 3 فحوصات مجانية</li>
-          <li>✓ تقارير فورية</li>
-          <li>✓ كشف العيوب الرئيسية</li>
+          <li>✓ <strong>رفع صورة واحدة فقط</strong> لكل فحص</li>
+          <li>✓ تقارير فورية وكشف للعيوب</li>
           <li>✓ تحميل PDF للتقرير</li>
         </ul>
       </div>
@@ -385,8 +390,8 @@
         <p class="text-xs text-emerald-400 mb-6">رصيد لا ينتهي أبداً</p>
         <ul class="space-y-2 text-sm text-slate-300 mb-8">
           <li>✓ 10 فحوصات عالية الدقة</li>
-          <li>✓ تحليل الخدوش والتلفيات</li>
-          <li>✓ مقارنة وصف البائع</li>
+          <li>✓ <strong>رفع صورة واحدة فقط</strong> لكل فحص</li>
+          <li>✓ تحليل الخدوش ومقارنة الوصف</li>
           <li>✓ تحميل PDF للتقرير</li>
           <li>✓ صالح مدى الحياة</li>
         </ul>
@@ -406,12 +411,12 @@
         <div class="text-3xl font-extrabold text-white mb-1">$14.99</div>
         <p class="text-xs text-emerald-400 mb-6">رصيد لا ينتهي أبداً</p>
         <ul class="space-y-2 text-sm text-slate-300 mb-8">
-          <li>✓ 50 فحصاً مفصلاً</li>
-          <li>✓ كشف العيوب المخفية</li>
-          <li>✓ أولوية في المعالجة</li>
-          <li>✓ تحميل PDF للتقرير</li>
-          <li>✓ صالح مدى الحياة</li>
-        </ul>
+  <li>✓ 50 فحصاً مفصلاً</li>
+  <li>✓ رفع حتى <strong>صورتين</strong> للمنتج الواحد</li>
+  <li>✓ كشف العيوب المخفية بدقة</li>
+  <li>✓ تحميل PDF للتقرير</li>
+  <li>✓ صالح مدى الحياة</li>
+</ul>
       </div>
       <a href="https://ainspector.lemonsqueezy.com/checkout/buy/db680fa5-9ec4-4fed-81fe-0ad4928266c3"
          class="lemonsqueezy-button w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-center text-sm transition-colors block">
@@ -426,12 +431,14 @@
         <p class="text-xs text-slate-400 mb-4">للمعارض ومكاتب الفحص</p>
         <div class="text-3xl font-extrabold text-white mb-1">$49.99<span class="text-sm font-normal text-slate-400">/شهر</span></div>
         <p class="text-xs text-slate-400 mb-6">تجديد آلي شهرياً</p>
-        <ul class="space-y-2 text-sm text-slate-300 mb-8">
-          <li>✓ 120 فحصاً شهرياً</li>
-          <li>✓ مسار معالجة خاص VIP</li>
-          <li>✓ تقارير موسعة + PDF</li>
-          <li>✓ دعم فني مباشر</li>
-        </ul>
+       <ul class="space-y-2 text-sm text-slate-300 mb-8">
+  <li>✓ 120 فحصاً شهرياً</li>
+  <li>✓ <strong>ترحيل الرصيد</strong> للشهر التالي (حتى 200 فحص)</li>
+  <li>✓ رفع حتى <strong>4 صور</strong> للمنتج الواحد</li>
+  <li>✓ <strong>طباعة شعارك الخاص</strong> (White-Label) على الـ PDF</li>
+  <li>✓ <strong>🎁 مكافأة ولاء:</strong> +30 فحص مجاني بعد 3 أشهر</li>
+  <li>✓ أولوية معالجة قصوى ⚡</li>
+</ul>
       </div>
       <a href="https://ainspector.lemonsqueezy.com/checkout/buy/ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072"
          class="lemonsqueezy-button w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-center text-sm transition-colors block">
@@ -448,27 +455,47 @@
   <div class="max-w-4xl mx-auto px-4">
     <div class="text-center mb-12">
       <h2 class="text-3xl font-bold text-white mb-4">الأسئلة الشائعة</h2>
-      <p class="text-slate-400">كل ما تحتاج معرفته عن طريقة الفحص والرصيد وسياسة الاستخدام</p>
+      <p class="text-slate-400">كل ما تحتاج معرفته عن طريقة الفحص، الرصيد، ورفع الصور المتعددة</p>
     </div>
     <div class="space-y-4">
 
+     <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
+  <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
+    <span>هل يمكنني رفع أكثر من صورة للمنتج الواحد؟</span>
+    <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
+  </summary>
+  <p class="text-slate-400 text-sm leading-relaxed mt-3">
+    نعم، تتيح لك باقة (Pro) رفع حتى صورتين للمنتج، بينما تتيح لك باقة الأعمال (VIP) رفع حتى 4 صور لنفس المنتج لفحصه من عدة زوايا مختلفة وزيادة دقة التقرير.
+  </p>
+</details>
+
       <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
         <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>كيف يتم الفحص؟</span>
+          <span>ما هي ميزة ترحيل الرصيد لباقة الأعمال (VIP)؟</span>
           <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
         </summary>
         <p class="text-slate-400 text-sm leading-relaxed mt-3">
-          ترفع صورة المنتج مع وصف مختصر (اختياري) عبر النموذج في الأعلى، ويقوم نظام الذكاء الاصطناعي بتحليل الصورة بحثاً عن الخدوش والتلفيات وأي تعارض مع وصف البائع، ثم يصدر تقريراً مفصلاً باللغة العربية خلال ثوانٍ معدودة. يمكنك بعدها تحميل التقرير بصيغة PDF مباشرة.
+          إذا لم تستهلك كامل رصيدك الشهري في باقة VIP، سيتم ترحيل الرصيد المتبقي للشهر التالي تلقائياً بحد أقصى 200 فحص، وذلك طالما أن اشتراكك الشهري نشط. في حال إلغاء الاشتراك، يعود الرصيد إلى الصفر بنهاية الفترة.
         </p>
       </details>
 
       <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
         <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>كيف يعمل نظام الرصيد؟</span>
+          <span>هل يمكنني تخصيص تقرير PDF بشعار متجري؟</span>
           <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
         </summary>
         <p class="text-slate-400 text-sm leading-relaxed mt-3">
-          كل بريد إلكتروني يحصل تلقائياً على 3 فحوصات مجانية عند أول استخدام. بعد نفاد الرصيد المجاني، يمكنك شراء إحدى الباقات (الأساسية أو المتقدمة Pro أو VIP) ليُضاف الرصيد إلى حسابك فوراً. رصيد الباقات الأساسية والمتقدمة لا ينتهي أبداً، بينما تتجدد باقة VIP شهرياً.
+          نعم، المشتركون في باقة الأعمال (VIP) يمكنهم الاستفادة من ميزة (White-Label) حيث يتم طباعة شعار معرضك أو متجرك الخاص على كافة تقارير الفحص الصادرة بدلاً من شعار منصتنا.
+        </p>
+      </details>
+      
+      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
+        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
+          <span>كيف أحصل على مكافأة الاستمرارية؟</span>
+          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-slate-400 text-sm leading-relaxed mt-3">
+          نقدر عملاءنا المستمرين! المشتركون في باقة الأعمال (VIP) يحصلون تلقائياً على مكافأة 30 فحصاً مجانياً تضاف إلى رصيدهم عند إتمام 3 أشهر متواصلة من الاشتراك النشط.
         </p>
       </details>
 
@@ -478,17 +505,7 @@
           <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
         </summary>
         <p class="text-slate-400 text-sm leading-relaxed mt-3">
-          سيظهر لك تنبيه بأن الرصيد قد نفد، وسيتم توجيهك مباشرة إلى قسم الباقات والأسعار لاختيار الباقة المناسبة واستكمال الفحص فوراً بعد الشراء.
-        </p>
-      </details>
-
-      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
-        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>كيف أحمّل تقرير الفحص بصيغة PDF؟</span>
-          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
-        </summary>
-        <p class="text-slate-400 text-sm leading-relaxed mt-3">
-          بعد اكتمال الفحص، يظهر تلقائياً زر "تحميل التقرير PDF" أسفل نتيجة الفحص مباشرة. التقرير يحتوي على لوغو الموقع، اسم المنتج، التاريخ، وجميع تفاصيل الفحص باللغة العربية. يعمل التحميل على أجهزة الكمبيوتر والجوالات (iOS وAndroid).
+          سيظهر لك تنبيه بأن الرصيد قد نفد، وسيتم توجيهك مباشرة إلى قسم الباقات والأسعار لاختيار الباقة المناسبة واستكمال الفحص فوراً بعد الشراء. رصيد الباقات الأساسية والمتقدمة لا ينتهي أبداً.
         </p>
       </details>
 
@@ -499,16 +516,6 @@
         </summary>
         <p class="text-slate-400 text-sm leading-relaxed mt-3">
           لا. تقرير AI Inspector أداة استشارية مساعدة تعتمد على التحليل البصري الآلي، وليست فحصاً ميكانيكياً أو قانونياً شاملاً. القرار النهائي للشراء أو البيع يعود إليك دائماً.
-        </p>
-      </details>
-
-      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
-        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>كيف أتواصل مع الدعم الفني؟</span>
-          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
-        </summary>
-        <p class="text-slate-400 text-sm leading-relaxed mt-3">
-          راسلنا في أي وقت عبر البريد الإلكتروني <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 underline">akashiiso04@gmail.com</a> أو عبر نموذج التواصل في أسفل الصفحة. سنقوم بالرد عليك في أقرب وقت ممكن.
         </p>
       </details>
 
@@ -586,11 +593,67 @@ function sendContactEmail() {
   document.getElementById('contact-sent').classList.remove('hidden');
 }
 
+/* ── Credits logic & Multiple images control ── */
+let currentPhotoLimit = 1;
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('upload-email').addEventListener('blur', async function() {
+    const email = this.value.trim();
+    if (!email) return;
+    try {
+      const r = await fetch(`/credits?email=${encodeURIComponent(email)}`);
+      const d = await r.json();
+      if (d.credits !== undefined) {
+        const planLabel = d.plan === 'exempt' ? 'مفتوح / استثناء' : d.plan;
+        document.getElementById('credits-info').textContent =
+          `رصيدك الحالي: ${d.credits} فحص (باقة: ${planLabel})`;
+        
+        /* Update multiple attribute based on photo_limit from API */
+        currentPhotoLimit = d.photo_limit || 1;
+        const fileInput = document.getElementById('upload-image');
+        const limitMsg = document.getElementById('photo-limit-msg');
+        
+        if (currentPhotoLimit > 1) {
+          fileInput.setAttribute('multiple', 'multiple');
+        } else {
+          fileInput.removeAttribute('multiple');
+        }
+        limitMsg.textContent = `الحد الأقصى للصور: ${currentPhotoLimit}`;
+      }
+    } catch(e) {}
+  });
+
+  /* Calculate and show cost dynamically when files are selected */
+  document.getElementById('upload-image').addEventListener('change', function() {
+    let files = this.files;
+    
+    // Validate limit
+    if (files.length > currentPhotoLimit) {
+      alert(`عذراً، باقتك الحالية تسمح برفع ${currentPhotoLimit} صورة كحد أقصى للمنتج الواحد.`);
+      const dt = new DataTransfer();
+      for (let i = 0; i < currentPhotoLimit; i++) {
+        dt.items.add(files[i]);
+      }
+      this.files = dt.files;
+      files = this.files;
+    }
+
+    const previewEl = document.getElementById('cost-preview');
+    if (files.length > 0) {
+      const cost = Math.max(1, Math.ceil(files.length / 2));
+      previewEl.textContent = `التكلفة المقدرة: ${cost} فحص (عدد الصور: ${files.length})`;
+      previewEl.classList.remove('hidden');
+    } else {
+      previewEl.classList.add('hidden');
+    }
+  });
+});
+
 /* ── Upload ── */
 async function submitUpload() {
   const email   = document.getElementById('upload-email').value.trim();
   const desc    = document.getElementById('upload-desc').value.trim();
-  const file    = document.getElementById('upload-image').files[0];
+  const files   = document.getElementById('upload-image').files;
   const errEl   = document.getElementById('upload-error');
   const resEl   = document.getElementById('result-area');
   const pdfArea = document.getElementById('pdf-area');
@@ -603,7 +666,7 @@ async function submitUpload() {
   pdfArea.classList.add('hidden');
 
   if (!email) { showError('يرجى إدخال بريدك الإلكتروني'); return; }
-  if (!file)  { showError('يرجى اختيار صورة'); return; }
+  if (files.length === 0)  { showError('يرجى اختيار صورة'); return; }
 
   btn.disabled = true;
   spinner.classList.remove('hidden');
@@ -612,7 +675,11 @@ async function submitUpload() {
   const form = new FormData();
   form.append('email',       email);
   form.append('description', desc);
-  form.append('image',       file);
+  
+  // Append multiple images properly to match app.py logic
+  for (let i = 0; i < files.length; i++) {
+    form.append('images', files[i]);
+  }
 
   try {
     const resp = await fetch('/upload', { method: 'POST', body: form });
@@ -655,23 +722,6 @@ function showError(msg) {
   el.textContent = msg;
   el.classList.remove('hidden');
 }
-
-/* ── Credits blur check ── */
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('upload-email').addEventListener('blur', async function() {
-    const email = this.value.trim();
-    if (!email) return;
-    try {
-      const r = await fetch(`/credits?email=${encodeURIComponent(email)}`);
-      const d = await r.json();
-      if (d.credits !== undefined) {
-        const planLabel = d.plan === 'exempt' ? 'مفتوح / استثناء' : d.plan;
-        document.getElementById('credits-info').textContent =
-          `رصيدك الحالي: ${d.credits} فحص (باقة: ${planLabel})`;
-      }
-    } catch(e) {}
-  });
-});
 
 /* ════════════════════════════════════════════
    PDF GENERATOR — Print-to-PDF method
@@ -851,3 +901,5 @@ function downloadPDF() {
   win.document.close();
 }
 </script>
+</body>
+</html>
