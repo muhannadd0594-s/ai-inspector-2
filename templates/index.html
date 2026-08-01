@@ -515,7 +515,7 @@ function renderPreviews() {
     wrap.className = 'preview-thumb';
     wrap.innerHTML = `
       <img src="${url}" alt="صورة ${idx+1}">
-      <button class="remove-btn" onclick="removeImage(${idx})" title="حذف">×</button>`;
+      <button type="button" class="remove-btn" onclick="removeImage(${idx})" title="حذف">×</button>`;
     container.appendChild(wrap);
   });
   updateCostPreview();
@@ -532,17 +532,25 @@ function removeImage(idx) {
 
 function onImagesSelected(input) {
   document.getElementById('upload-error').classList.add('hidden');
-  const files = Array.from(input.files);
-  if (files.length > currentPhotoLimit) {
+  
+  // أخذ الصور الجديدة ودمجها مع الصور القديمة
+  const newFiles = Array.from(input.files);
+  let combinedFiles = selectedFiles.concat(newFiles);
+  
+  // التأكد من عدم تجاوز الحد الأقصى للباقة
+  if (combinedFiles.length > currentPhotoLimit) {
     showError(`باقتك تسمح بـ ${currentPhotoLimit} صورة كحد أقصى.`);
-    // Keep only up to the limit
-    selectedFiles = files.slice(0, currentPhotoLimit);
-    const dt = new DataTransfer();
-    selectedFiles.forEach(f => dt.items.add(f));
-    input.files = dt.files;
-  } else {
-    selectedFiles = files;
+    combinedFiles = combinedFiles.slice(0, currentPhotoLimit);
   }
+  
+  // تحديث المصفوفة الأساسية
+  selectedFiles = combinedFiles;
+  
+  // مزامنة حقل الرفع مع الصور المجمعة
+  const dt = new DataTransfer();
+  selectedFiles.forEach(f => dt.items.add(f));
+  input.files = dt.files;
+  
   renderPreviews();
 }
 
