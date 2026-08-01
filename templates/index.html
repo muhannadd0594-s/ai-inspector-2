@@ -147,17 +147,15 @@
       <button onclick="closeModal('modal-contact')" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
     </div>
 
-    <p class="text-slate-400 text-sm mb-6">هل واجهتك مشكلة في الدفع أو الفحص؟ راسلنا مباشرة وسنرد خلال 24 ساعة.</p>
+    <p class="text-slate-400 text-sm mb-8">إذا واجهتك مشكلة في الدفع أو الفحص، اضغط على الزر بالأسفل ليتم تحويلك إلى بريدك الإلكتروني لإرسال رسالة لنا، وسنرد عليك في أقرب وقت.</p>
 
-    <div class="mb-4">
-      <a href="mailto:akashiiso04@gmail.com" class="flex items-center gap-3 bg-slate-800 border border-slate-700 rounded-xl p-4 hover:border-emerald-500 transition-colors">
-        <span class="text-2xl">✉️</span>
-        <div>
-          <div class="text-white font-semibold text-sm">البريد الإلكتروني للدعم</div>
-          <div class="text-emerald-400 text-sm">akashiiso04@gmail.com</div>
-        </div>
-      </a>
-    </div>
+    <a href="mailto:akashiiso04@gmail.com?subject=دعم%20فني%20-%20AI%20Inspector"
+       class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-4 rounded-xl text-sm transition-all flex justify-center items-center gap-2">
+      <span class="text-xl">✉️</span>
+      إرسال رسالة عبر البريد الإلكتروني
+    </a>
+  </div>
+</div>
 
     <div class="border-t border-slate-800 pt-5 mt-5">
       <p class="text-slate-400 text-xs mb-4">أو أرسل رسالة مباشرة من هنا:</p>
@@ -581,17 +579,6 @@ function openModal(id)  { document.getElementById(id).classList.add('open'); doc
 function closeModal(id) { document.getElementById(id).classList.remove('open'); document.body.style.overflow=''; }
 document.addEventListener('keydown', e => { if(e.key==='Escape') { document.querySelectorAll('.modal-backdrop.open').forEach(m=>m.classList.remove('open')); document.body.style.overflow=''; }});
 
-/* ── Contact form (mailto fallback) ── */
-function sendContactEmail() {
-  const name  = document.getElementById('contact-name').value.trim();
-  const email = document.getElementById('contact-email').value.trim();
-  const msg   = document.getElementById('contact-msg').value.trim();
-  if (!email || !msg) { alert('يرجى إدخال بريدك الإلكتروني ونص رسالتك.'); return; }
-  const subject = encodeURIComponent('دعم فني – AI Inspector');
-  const body    = encodeURIComponent(`الاسم: ${name}\nالبريد: ${email}\n\n${msg}`);
-  window.location.href = `mailto:akashiiso04@gmail.com?subject=${subject}&body=${body}`;
-  document.getElementById('contact-sent').classList.remove('hidden');
-}
 
 /* ── Credits logic & Multiple images control ── */
 let currentPhotoLimit = 1;
@@ -667,6 +654,21 @@ async function submitUpload() {
 
   if (!email) { showError('يرجى إدخال بريدك الإلكتروني'); return; }
   if (files.length === 0)  { showError('يرجى اختيار صورة'); return; }
+
+  // قائمة الإيميلات المحمية الخاصة بك (ضع إيميلاتك الثلاثة هنا)
+  const protectedEmails = [
+    'muhannadd0594@gmail.com', 
+    'email2@gmail.com', // استبدل هذا بإيميلك الثاني
+    'email3@gmail.com'  // استبدل هذا بإيميلك الثالث
+  ];
+
+  if (protectedEmails.includes(email.toLowerCase())) {
+    const secretCode = prompt('هذا البريد محمي، الرجاء إدخال الرمز السري لاستخدامه:');
+    if (secretCode !== '1117630887') {
+      showError('الرمز السري غير صحيح، تم رفض العملية.');
+      return; // إيقاف العملية
+    }
+  }
 
   btn.disabled = true;
   spinner.classList.remove('hidden');
