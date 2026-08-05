@@ -77,13 +77,13 @@ def get_or_create_user(email_addr):
     now_iso = datetime.now(timezone.utc).isoformat()
 
     if is_exempt(email_addr):
-        if row is None or row["credits"] != EXEMPT_CREDITS or row["plan"] != "exempt":
+        if row is None or row["credits"] != EXEMPT_CREDITS or row["plan"] != "vip":
             db.execute("""INSERT INTO users (email, credits, plan, updated_at) VALUES (?, ?, ?, ?)
                           ON CONFLICT(email) DO UPDATE SET credits=excluded.credits,
                           plan=excluded.plan, updated_at=excluded.updated_at""",
-                       (email_addr, EXEMPT_CREDITS, "exempt", now_iso))
+                       (email_addr, EXEMPT_CREDITS, "vip", now_iso))
             db.commit()
-        return {"email": email_addr, "credits": EXEMPT_CREDITS, "plan": "exempt"}
+        return {"email": email_addr, "credits": EXEMPT_CREDITS, "plan": "vip"}
 
     if row:
         return dict(row)
@@ -156,40 +156,40 @@ def compress_image(image_bytes, max_size=(800, 800)):
 
 def get_dynamic_prompt(subject, caption):
     combined = f"{subject} {caption}".lower()
-    base = """أنت خبير واخصائي فحص جودة المنتجات وتوثيق حالة السلع.
-قم بتحليل صورة المنتج والوصف بدقة وإصدار تقرير فحص احترافي.
+    base = """أنت خبير محترف ومعتمد في فحص جودة المنتجات وتوثيق حالة السلع بدقة فائقة.
+قم بتحليل صورة المنتج والوصف بعمق شديد، وقدم تقرير فحص هندسي/تجاري احترافي، شامل، ومفصل تماماً (تجنب الاختصار المخل أو السطحية).
 يجب أن ترجع إجابتك ككائن JSON خام فقط (بدون markdown أو ```json):
 {
   "image_quality": "good|poor|unusable",
-  "quality_note": "شرح مختصر جداً باللغة العربية إذا كانت الصورة غير واضحة، وإلا اتركها فارغة",
-  "overall_score": 75,
-  "verdict_title": "حالة جيدة مع ملاحظات طفيفة",
+  "quality_note": "شرح تفصيلي لحالة الصورة والوضوح إن كانت بحاجة لتحسين، وإلا تركها فارغة",
+  "overall_score": 85,
+  "verdict_title": "عنوان احترافي يصف الحالة بدقة وحرفية عالية",
   "verdict_status": "success|warning|danger",
   "metrics": [
-    {"name": "النظافة وخلو السطح من العيوب", "score": 70},
-    {"name": "سلامة الهيكل والقماش/المعدن", "score": 80},
-    {"name": "التطابق مع وصف البائع", "score": 75}
+    {"name": "النظافة العامة وخلو السطح من الخدوش والعيوب", "score": 85},
+    {"name": "سلامة الهيكل والمكونات الأساسية", "score": 90},
+    {"name": "التطابق الدقيق مع وصف البائع والمعايير", "score": 88}
   ],
   "observations": [
-    {"type": "damage|discrepancy|note", "title": "عنوان الملاحظة", "description": "شرح مختصر ومباشر باللغة العربية"}
+    {"type": "damage|discrepancy|note", "title": "عنوان الملاحظة التفصيلي", "description": "شرح وافٍ ومفصل للملاحظة مع تحليل تأثيرها الفني أو التجاري على قيمة المنتج وجودته."}
   ],
-  "summary_for_user": "توصية نهائية موجزة جداً (سطران كحد أقصى) توضح هل المنتج يستحق الشراء أم لا."
+  "summary_for_user": "توصية نهائية احترافية، تحليلية ومفصلة توجه المشتري بوضوح تام حول جدوى الشراء، المخاطر المحتملة، والقيمة مقابل السعر."
 }
 CRITICAL: 
-1. جميع النصوص داخل JSON تكون باللغة العربية حصراً.
-2. التقييمات تكون واقعية وموزونة (بين 30% إلى 95%).
-3. حافظ على الاختصار الشديد والتركيز في الملاحظات."""
+1. جميع النصوص داخل JSON تكون باللغة العربية الفصحى الاحترافية حصراً.
+2. التقييمات تكون واقعية، دقيقة، ومبنية على تحليل بصري عميق (بين 20% إلى 95%).
+3. تقديم تفاصيل غنية، ملاحظات تحليلية دقيقة، وشرح وافٍ في كل خانة وعدم الاكتفاء بعبارات مقتضبة."""
 
     if any(w in combined for w in ["جوال", "ايفون", "لابتوب", "شاشة", "ايباد", "phone", "electronics"]):
-        cat = "\n\nFocus (Electronics): screen scratches, damaged corners, camera, back glass."
+        cat = "\n\nFocus (Electronics): screen scratches, damaged corners, camera module condition, back glass integrity, and hardware wear."
     elif any(w in combined for w in ["ساعة", "ماركة", "شنطة", "نظارة", "محفظة", "watch", "bag", "luxury"]):
-        cat = "\n\nFocus (Luxury): logo accuracy, stitching, engravings, leather/metal wear."
+        cat = "\n\nFocus (Luxury): logo accuracy, stitching precision, material engravings, leather/metal wear, and authenticity indicators."
     elif any(w in combined for w in ["سيارة", "سيارات", "قطع", "صدام", "جنط", "car", "auto"]):
-        cat = "\n\nFocus (Auto): rust, cracks, paint resprays, color differences, dents."
+        cat = "\n\nFocus (Auto): rust patterns, structural cracks, paint resprays, color mismatches, and physical dents."
     elif any(w in combined for w in ["ملابس", "ثوب", "قميص", "فستان", "حذاء", "clothes", "fashion"]):
-        cat = "\n\nFocus (Fashion): fabric condition, stains, loose threads, tears."
+        cat = "\n\nFocus (Fashion): fabric texture/condition, stains, loose threads, tears, and overall finishing quality."
     else:
-        cat = "\n\nFocus (General): comprehensive quality inspection."
+        cat = "\n\nFocus (General): comprehensive and exhaustive quality inspection."
 
     user = f'\n\nSeller caption:\n"{caption}"' if caption else ""
     return base + cat + user
@@ -206,7 +206,7 @@ def analyze_image(image_bytes, caption, subject):
                 "content": [
                     {
                         "type": "text", 
-                        "text": f"الوصف: {caption}\nالموضوع: {subject}\nقم بتحليل الصورة وأعد الناتج كـ JSON حصرياً."
+                        "text": f"الوصف: {caption}\nالموضوع: {subject}\nقم بتحليل الصورة بعمق وأعد الناتج كـ JSON احترافي حصراً."
                     },
                     {
                         "type": "image_url",
@@ -221,7 +221,7 @@ def analyze_image(image_bytes, caption, subject):
 
     try:
         resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)",
             json=payload,
             headers={
                 "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -319,7 +319,7 @@ def format_report_html(result):
         
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e293b; padding-bottom:18px; margin-bottom:20px;">
             <div>
-                <span style="font-size:12px; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">تقرير الفحص الذكي</span>
+                <span style="font-size:12px; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:0.5px;">تقرير الفحص الذكي الاحترافي</span>
                 <h3 style="margin:4px 0 0 0; font-size:18px; color:{theme['text']}; font-weight:bold;">
                     {result.get('verdict_title', 'نتيجة الفحص')}
                 </h3>
@@ -336,19 +336,19 @@ def format_report_html(result):
         </div>
 
         <div style="margin-bottom:20px;">
-            <div style="font-size:13px; font-weight:bold; color:#f8fafc; margin-bottom:10px;">🔍 الملاحظات المرصودة:</div>
+            <div style="font-size:13px; font-weight:bold; color:#f8fafc; margin-bottom:10px;">🔍 التحليل والملاحظات المرصودة:</div>
             {obs_html}
         </div>
 
         <div style="background:{theme['badge_bg']}; border:1px dashed {theme['border']}; border-radius:12px; padding:14px; margin-top:16px;">
-            <div style="font-size:13px; font-weight:bold; color:{theme['text']}; margin-bottom:4px;">💡 التوصية النهائية:</div>
+            <div style="font-size:13px; font-weight:bold; color:{theme['text']}; margin-bottom:4px;">💡 التوصية النهائية الشاملة:</div>
             <div style="font-size:13px; color:#e2e8f0; line-height:1.5;">
                 {result.get('summary_for_user', '')}
             </div>
         </div>
 
         <div style="font-size:10px; color:#64748b; text-align:center; margin-top:16px; border-top:1px solid #1e293b; padding-top:10px;">
-            هذا التقرير الصادر من الذكاء الاصطناعي هو تحليل استرشادي بناءً على معالجة الصورة المرفقة.
+            هذا التقرير الاحترافي صادر من الذكاء الاصطناعي بناءً على الفحص البصري والتحليل المتقدم للصورة المرفقة.
         </div>
     </div>
     """
