@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import io
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify, render_template, g
+from flask import Flask, request, jsonify, render_template, 
 import requests
 from dotenv import load_dotenv
 from PIL import Image
