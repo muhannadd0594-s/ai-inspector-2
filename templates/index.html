@@ -469,8 +469,6 @@ let currentPhotoLimit = 1;
 let isExempt          = false;
 let selectedFiles     = [];   // Array of File objects for product images
 
-const PROTECTED_EMAILS = ['muhannadd0594@gmail.com','mohammdlghmd@gmail.com','akashiiso04@gmail.com'];
-const SECRET_CODE      = '1117630887';
 
 /* ════ Modals ════ */
 function openModal(id)  { document.getElementById(id).classList.add('open');    document.body.style.overflow='hidden'; }
@@ -512,7 +510,7 @@ document.getElementById('upload-email').addEventListener('input', function(e) {
   const logoSec = document.getElementById('custom-logo-section');
   const creditsInfo = document.getElementById('credits-info');
 
-  if (PROTECTED_EMAILS.includes(email)) {
+  if (typeof PROTECTED_EMAILS !== 'undefined' && PROTECTED_EMAILS.includes(email)) {
     isExempt = true;
     currentPhotoLimit = 4;
     limitMsg.textContent = 'الحد الأقصى: 4 صور (حساب استثنائي)';
@@ -581,82 +579,6 @@ function onLogoSelected(input) {
   document.getElementById('logo-preview-wrap').classList.remove('hidden');
 }
 
-/* ════ Submit Upload Logic ════ */
-async function submitUpload() {
-  const email = document.getElementById('upload-email').value.trim();
-  const desc = document.getElementById('upload-desc').value.trim();
-  const errEl = document.getElementById('upload-error');
-  const btn = document.getElementById('upload-btn');
-  const btnText = document.getElementById('btn-text');
-  const spinner = document.getElementById('btn-spinner');
-  const resultArea = document.getElementById('result-area');
-  const pdfArea = document.getElementById('pdf-area');
-
-  errEl.classList.add('hidden');
-
-  if (!email) {
-    showError('يرجى إدخال البريد الإلكتروني أولاً.');
-    return;
-  }
-  if (selectedFiles.length === 0) {
-    showError('يرجى اختيار صورة واحدة على الأقل للفحص.');
-    return;
-  }
-
-  // UI Loading state
-  btn.disabled = true;
-  btn.classList.add('opacity-75', 'cursor-not-allowed');
-  btnText.textContent = 'جاري التحليل بالذكاء الاصطناعي...';
-  spinner.classList.remove('hidden');
-
-  try {
-    const formData = new FormData();
-    formData.append('email', email);
-    formData.append('description', desc);
-    selectedFiles.forEach((file) => formData.append('images', file));
-
-    const logoInput = document.getElementById('upload-logo');
-    if (logoInput && logoInput.files[0]) {
-      formData.append('logo', logoInput.files[0]);
-    }
-
-    // إرسال البيانات للـ Backend (محاكاة الاستجابة لضمان تشغيل الواجهة بشكل سلس)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // عرض نتيجة الفحص
-    resultArea.innerHTML = `
-      <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl p-6 text-right shadow-lg">
-        <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
-          <span class="bg-emerald-500/10 text-emerald-400 text-xs px-3 py-1 rounded-full font-bold border border-emerald-500/20">مكتمل الفحص ✅</span>
-          <span class="text-xs text-slate-400">${new Date().toLocaleDateString('ar-SA')}</span>
-        </div>
-        <h4 class="text-white font-bold text-lg mb-2">نتيجة التحليل البصري:</h4>
-        <p class="text-slate-300 text-sm leading-relaxed mb-4">
-          تم فحص المنتج بنجاح. تبيّن أن حالة البدن والسطح جيدة بنسبة 92%. لا توجد كسور ظاهرة في الشاشة أو هيكل المنتج، وتفاصيل الحواف مطابقة للوصف.
-        </p>
-        <div class="bg-slate-800/80 p-3 rounded-lg text-xs text-slate-300 border border-slate-700">
-          💡 <strong>التوصية:</strong> المنتج بحالة ممتازة ومناسب للشراء بسعر السوق المستعمل.
-        </div>
-      </div>
-    `;
-    resultArea.classList.remove('hidden');
-    pdfArea.classList.remove('hidden');
-
-  } catch (err) {
-    showError('حدث خطأ أثناء الاتصال بالسيرفر. يرجى المحاولة لاحقاً.');
-  } finally {
-    btn.disabled = false;
-    btn.classList.remove('opacity-75', 'cursor-not-allowed');
-    btnText.textContent = 'فحص الصورة الآن ←';
-    spinner.classList.add('hidden');
-  }
-}
-
-/* ════ Download PDF Logic ════ */
-function downloadPDF() {
-  alert('جاري توليد التقرير بصيغة PDF وتحميله...');
-}
-
 /* ════ Credits Check on Email Blur ════ */
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('upload-email').addEventListener('blur', async function () {
@@ -708,7 +630,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof updateCostPreview === 'function') updateCostPreview();
       }
     } catch (e) {
-      // طباعة الخطأ في الكونسول لتسهيل اكتشافه بدلاً من الصمت
       console.error('حدث خطأ أثناء جلب الرصيد:', e);
     }
   });
@@ -725,7 +646,6 @@ async function submitUpload() {
   const spinner = document.getElementById('btn-spinner');
   const btnText = document.getElementById('btn-text');
 
-  // دوال مساعدة لإظهار الخطأ (تأكد من وجود دالة showError أو استخدم هذه)
   const displayError = (msg) => {
     if(typeof showError === 'function') showError(msg);
     else { errEl.textContent = msg; errEl.classList.remove('hidden'); }
@@ -740,7 +660,7 @@ async function submitUpload() {
     displayError('يرجى اختيار صورة واحدة على الأقل'); return; 
   }
 
-  /* معالجة الإيميلات المحمية - التحقق يتم في السيرفر الآن */
+  /* معالجة الإيميلات المحمية */
   let userSecretCode = '';
   if (typeof PROTECTED_EMAILS !== 'undefined' && PROTECTED_EMAILS.includes(email)) {
     const entered = prompt('⚠️ هذا البريد محمي.\nأدخل الرمز السري للمتابعة:');
@@ -757,10 +677,9 @@ async function submitUpload() {
   form.append('email', email);
   form.append('description', desc);
   
-  // إرسال الرمز السري للسيرفر ليتأكد منه
   if (userSecretCode) form.append('secret_code', userSecretCode);
 
- selectedFiles.forEach(f => form.append('image', f));
+  selectedFiles.forEach(f => form.append('image', f));
 
   // الشعار المخصص (اختياري)
   const logoInput = document.getElementById('upload-logo');
@@ -822,7 +741,7 @@ function downloadPDF() {
   const desc = window._lastDesc || 'تقرير فحص المنتج';
   const date = new Date().toLocaleDateString('ar-SA', { year:'numeric', month:'long', day:'numeric' });
 
-  /* إعادة تنسيق الألوان للطباعة باستخدام الـ DOM Properties بشكل أكثر استقراراً من Regex */
+  /* إعادة تنسيق الألوان للطباعة */
   const tmp = document.createElement('div');
   tmp.innerHTML = window._lastReportHtml;
   
@@ -831,21 +750,18 @@ function downloadPDF() {
       const bg = el.style.backgroundColor;
       const col = el.style.color;
 
-      // تحويل الخلفيات الداكنة إلى فاتحة
       if (bg === 'rgb(15, 23, 42)' || bg === '#0f172a') el.style.backgroundColor = '#f8fafc';
       else if (bg === 'rgb(30, 41, 59)' || bg === '#1e293b') el.style.backgroundColor = '#f1f5f9';
       else if (bg === 'rgb(24, 34, 52)' || bg === '#182234') el.style.backgroundColor = '#f1f5f9';
-      else if (bg === 'rgba(17, 46, 35, 1)') el.style.backgroundColor = '#ecfdf5'; // أو قيم مقاربة
+      else if (bg === 'rgba(17, 46, 35, 1)') el.style.backgroundColor = '#ecfdf5';
       else if (bg === 'rgb(51, 65, 85)' || bg === '#334155') el.style.backgroundColor = '#e2e8f0';
 
-      // تحويل النصوص الفاتحة إلى داكنة
       if (col === 'rgb(248, 250, 252)' || col === '#f8fafc') el.style.color = '#0f172a';
       else if (col === 'rgb(226, 232, 240)' || col === '#e2e8f0') el.style.color = '#1e293b';
       else if (col === 'rgb(203, 213, 225)' || col === '#cbd5e1') el.style.color = '#334155';
       else if (col === 'rgb(148, 163, 184)' || col === '#94a3b8') el.style.color = '#475569';
       else if (col === 'rgb(100, 116, 139)' || col === '#64748b') el.style.color = '#475569';
 
-      // إزالة الظلال المزعجة في الطباعة
       el.style.boxShadow = 'none';
     }
   });
