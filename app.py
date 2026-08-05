@@ -18,7 +18,7 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("ai-inspector")
 
-# === أضف هذا المسار ليعرض ملف templates/index.html عند زيارة الموقع ===
+# === المسار الرئيسي لعرض واجهة المستخدم ===
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -26,6 +26,7 @@ def home():
 # ─── Configuration & Credentials ───────────────────────────────────────────
 OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
 LEMONSQUEEZY_SECRET = os.environ.get("LEMONSQUEEZY_SECRET", "")
+ADMIN_SECRET_CODE   = os.environ.get("ADMIN_SECRET_CODE", "")
 SITE_URL            = "editchecker.com"
 DB_PATH             = os.environ.get("DB_PATH", "/tmp/inspector.db")
 FREE_CREDITS        = 3
@@ -42,7 +43,7 @@ EXEMPT_EMAILS = {
 PLAN_CREDITS = {
     "e810b85b-5273-4da2-9477-f3cf62f9737d": ("basic", 10),
     "db680fa5-9ec4-4fed-81fe-0ad4928266c3": ("pro",   50),
-    "ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072": ("vip",  120),
+    "ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072": ("vip",   120),
 }
 
 # ─── Database Helpers ───────────────────────────────────────────────────────
@@ -231,16 +232,16 @@ def analyze_image(image_bytes, caption, subject):
 
     try:
         resp = requests.post(
-    "https://openrouter.ai/api/v1/chat/completions",
-    json=payload,
-    headers={
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": f"https://{SITE_URL}",
-        "X-Title": "AI Product Inspector"
-    },
-    timeout=45
-)
+            "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)",
+            json=payload,
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": f"https://{SITE_URL}",
+                "X-Title": "AI Product Inspector"
+            },
+            timeout=45
+        )
         resp.raise_for_status()
     except requests.RequestException as e:
         log.error("OpenRouter API Error: %s", str(e))
@@ -363,35 +364,88 @@ def format_report_html(result):
     </div>
     """
 
+# ─── Endpoints ──────────────────────────────────────────────────────────────
+
 @app.route("/credits", methods=["GET"])
 def credits_check():
     email_addr = request.args.get("email", "").strip().lower()
     if not email_addr:
         return jsonify({"error": "email required"}), 400
+
     user = get_or_create_user(email_addr)
-    return jsonify({"credits": user["credits"], "plan": user["plan"]})
+
+    photo_limit_map = {
+        "free":   1,
+        "basic":  1,
+        "pro":    2,
+        "vip":    4,
+        "exempt": 4
+    }
+    photo_limit   = photo_limit_map.get(user["plan"], 1)
+    is_exempt_user = is_exempt(email_addr)
+
+    return jsonify({
+        "credits":     user["credits"],
+        "plan":        user["plan"],
+        "photo_limit": photo_limit,
+        "is_exempt":   is_exempt_user
+    })
 
 @app.route("/upload", methods=["POST"])
 def direct_upload():
-    email_addr  = request.form.get("email", "").strip().lower()
-    description = request.form.get("description", "")
-    image_file  = request.files.get("image")
+    email_addr        = request.form.get("email", "").strip().lower()
+    description       = request.form.get("description", "")
+    secret_code_input = request.form.get("secret_code", "").strip()
+    image_files       = request.files.getlist("image")   # ← getlist لدعم صور متعددة
 
     if not email_addr:
         return jsonify({"error": "البريد الإلكتروني مطلوب"}), 400
-    if not image_file:
+    if not image_files:
         return jsonify({"error": "لم يتم رفع أي صورة"}), 400
 
-    if not deduct_credit(email_addr):
-        return jsonify({"error": "نفد رصيدك", "credits": 0}), 402
+    # ── التحقق من الرمز السري للإيميلات المحمية/المستثناة ────────────────
+    if is_exempt(email_addr):
+        if not secret_code_input:
+            return jsonify({
+                "error":   "secret_required",
+                "message": "هذا الحساب محمي، أدخل الرمز السري للمتابعة"
+            }), 401
+        if secret_code_input != ADMIN_SECRET_CODE:
+            return jsonify({
+                "error":   "invalid_secret",
+                "message": "الرمز السري غير صحيح"
+            }), 403
+
+    # حساب تكلفة الفحص حسب عدد الصور
+    num_images = len(image_files)
+    cost       = max(1, num_images // 2)
+
+    user = get_or_create_user(email_addr)
+    if not is_exempt(email_addr) and user["credits"] < cost:
+        return jsonify({"error": "نفد رصيدك", "credits": user["credits"]}), 402
+
+    # خصم الرصيد للعملاء العاديين
+    if not is_exempt(email_addr):
+        db = get_db()
+        db.execute(
+            "UPDATE users SET credits=credits-?, updated_at=? WHERE email=?",
+            (cost, datetime.now(timezone.utc).isoformat(), email_addr)
+        )
+        db.commit()
 
     try:
-        result = analyze_image(image_file.read(), description, description)
+        # قراءة وتحليل الصورة الأولى الرئيسية
+        primary_image_bytes = image_files[0].read()
+        result = analyze_image(primary_image_bytes, description, description)
         user   = get_or_create_user(email_addr)
+
         return jsonify({
-            "status": "success",
-            "report": format_report_html(result),
-            "credits": user["credits"]
+            "status":    "success",
+            "report":    format_report_html(result),
+            "credits":   user["credits"],
+            "cost":      cost,
+            "plan":      user["plan"],
+            "is_exempt": is_exempt(email_addr)
         })
     except Exception as e:
         log.exception("Upload analysis error")
@@ -423,7 +477,7 @@ def lemonsqueezy_webhook():
             log.error("LemonSqueezy: no customer email in payload")
             return jsonify({"error": "no email"}), 400
 
-        # ── One-time purchase (Basic / Pro) ────────────────────────────────
+        # ── الشراء لمرة واحدة (Basic / Pro) ────────────────────────────────
         if event_name == "order_created":
             variant_id = None
             for item in payload.get("included", []):
@@ -444,19 +498,19 @@ def lemonsqueezy_webhook():
                      credits, plan_name, customer_email, variant_id)
             return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
 
-        # ── VIP: first subscription ────────────────────────────────────────
+        # ── VIP: الاشتراك لأول مرة ─────────────────────────────────────────
         elif event_name == "subscription_created":
             add_vip_credits(customer_email)
             log.info("VIP created for %s", customer_email)
             return jsonify({"status": "vip_created"}), 200
 
-        # ── VIP: monthly renewal ───────────────────────────────────────────
+        # ── VIP: التجديد الشهري ────────────────────────────────────────────
         elif event_name == "subscription_payment_success":
             add_vip_credits(customer_email)
             log.info("VIP renewed for %s", customer_email)
             return jsonify({"status": "renewed"}), 200
 
-        # ── VIP: cancelled / expired / failed ─────────────────────────────
+        # ── VIP: الإلغاء أو الفشل ──────────────────────────────────────────
         elif event_name in ("subscription_cancelled", "subscription_expired",
                             "subscription_payment_failed"):
             log.info("VIP ended for %s — event: %s", customer_email, event_name)
