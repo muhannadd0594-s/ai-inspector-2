@@ -695,16 +695,20 @@ async function submitUpload() {
       displayError('حدث خطأ 404: الخادم أو الرابط غير موجود.');
       return;
     }
+    
+    // التعديل هنا: قراءة الرسالة القادمة من الباك إند
     if (resp.status === 401 || resp.status === 403) {
-      displayError('الرمز السري غير صحيح أو أنك لا تملك صلاحية الوصول.');
+      const errorData = await resp.json();
+      displayError(errorData.message || 'الرمز السري غير صحيح أو أنك لا تملك صلاحية الوصول.');
       return;
     }
+    
     if (resp.status === 402) {
       displayError('نفد رصيدك. اشترِ باقة للاستمرار.');
       document.getElementById('pricing').scrollIntoView({ behavior: 'smooth' });
       return;
     }
-
+    
     const data = await resp.json();
     if (!resp.ok || data.error) { displayError(data.error || 'حدث خطأ، حاول مرة أخرى'); return; }
 
