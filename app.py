@@ -26,7 +26,7 @@ def home():
 # ─── Configuration & Credentials ───────────────────────────────────────────
 OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
 LEMONSQUEEZY_SECRET = os.environ.get("LEMONSQUEEZY_SECRET", "")
-ADMIN_SECRET_CODE   = os.environ.get("ADMIN_SECRET_CODE", "")
+ADMIN_SECRET_CODE = os.environ.get("ADMIN_SECRET_CODE", "").strip()
 SITE_URL            = "editchecker.com"
 DB_PATH             = os.environ.get("DB_PATH", "/tmp/inspector.db")
 FREE_CREDITS        = 3
@@ -396,7 +396,7 @@ def direct_upload():
     email_addr        = request.form.get("email", "").strip().lower()
     description       = request.form.get("description", "")
     secret_code_input = request.form.get("secret_code", "").strip()
-    image_files       = request.files.getlist("image")   # ← getlist لدعم صور متعددة
+    image_files       = request.files.getlist("image")
 
     if not email_addr:
         return jsonify({"error": "البريد الإلكتروني مطلوب"}), 400
@@ -405,15 +405,20 @@ def direct_upload():
 
     # ── التحقق من الرمز السري للإيميلات المحمية/المستثناة ────────────────
     if is_exempt(email_addr):
+        # للتأكد عبر سجلات السيرفر عند حدوث المشكلة
+        log.info(f"Checking exempt email: {email_addr} | Env Code Loaded: {'Yes' if ADMIN_SECRET_CODE else 'No'}")
+        
         if not secret_code_input:
             return jsonify({
                 "error":   "secret_required",
                 "message": "هذا الحساب محمي، أدخل الرمز السري للمتابعة"
             }), 401
-        if secret_code_input != ADMIN_SECRET_CODE:
+            
+        if not ADMIN_SECRET_CODE or secret_code_input != ADMIN_SECRET_CODE:
+            log.warning(f"Unauthorized secret code attempt for {email_addr}")
             return jsonify({
                 "error":   "invalid_secret",
-                "message": "الرمز السري غير صحيح"
+                "message": "الرمز السري غير صحيح أو لم يتم ضبطه في السيرفر"
             }), 403
 
     # حساب تكلفة الفحص حسب عدد الصور
