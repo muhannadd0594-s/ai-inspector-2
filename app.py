@@ -6,7 +6,7 @@ import sqlite3
 import hashlib
 import hmac
 import io
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template, g
 import requests
 from dotenv import load_dotenv
@@ -68,12 +68,14 @@ def get_or_create_user(email_addr):
     email_addr = email_addr.strip().lower()
     row = db.execute("SELECT * FROM users WHERE email=?", (email_addr,)).fetchone()
 
+    now_iso = datetime.now(timezone.utc).isoformat()
+
     if is_exempt(email_addr):
         if row is None or row["credits"] != EXEMPT_CREDITS or row["plan"] != "exempt":
             db.execute("""INSERT INTO users (email, credits, plan, updated_at) VALUES (?, ?, ?, ?)
                           ON CONFLICT(email) DO UPDATE SET credits=excluded.credits,
                           plan=excluded.plan, updated_at=excluded.updated_at""",
-                       (email_addr, EXEMPT_CREDITS, "exempt", datetime.utcnow().isoformat()))
+                       (email_addr, EXEMPT_CREDITS, "exempt", now_iso))
             db.commit()
         return {"email": email_addr, "credits": EXEMPT_CREDITS, "plan": "exempt"}
 
@@ -81,7 +83,7 @@ def get_or_create_user(email_addr):
         return dict(row)
 
     db.execute("INSERT INTO users (email, credits, plan, updated_at) VALUES (?, ?, ?, ?)",
-               (email_addr, FREE_CREDITS, "free", datetime.utcnow().isoformat()))
+               (email_addr, FREE_CREDITS, "free", now_iso))
     db.commit()
     return {"email": email_addr, "credits": FREE_CREDITS, "plan": "free"}
 
@@ -97,7 +99,7 @@ def deduct_credit(email_addr):
         return False
 
     db.execute("UPDATE users SET credits=credits-1, updated_at=? WHERE email=?",
-               (datetime.utcnow().isoformat(), email_addr))
+               (datetime.now(timezone.utc).isoformat(), email_addr))
     db.commit()
     return True
 
@@ -109,16 +111,15 @@ def add_vip_credits(email_addr):
     if is_exempt(email_addr):
         return
     get_or_create_user(email_addr)
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE users
-                SET credits    = LEAST(credits + 120, 200),
-                    plan       = 'vip',
-                    updated_at = %s
-                WHERE email = %s
-            """, (datetime.utcnow().isoformat(), email_addr))
-        conn.commit()
+    db = get_db()
+    db.execute("""
+        UPDATE users
+        SET credits    = MIN(credits + 120, 200),
+            plan       = 'vip',
+            updated_at = ?
+        WHERE email = ?
+    """, (datetime.now(timezone.utc).isoformat(), email_addr))
+    db.commit()
     log.info("VIP credits added for %s (cap 200)", email_addr)
 
 def add_credits(email_addr, plan, amount):
@@ -130,7 +131,7 @@ def add_credits(email_addr, plan, amount):
         return
 
     db.execute("UPDATE users SET credits=credits+?, plan=?, updated_at=? WHERE email=?",
-               (amount, plan, datetime.utcnow().isoformat(), email_addr))
+               (amount, plan, datetime.now(timezone.utc).isoformat(), email_addr))
     db.commit()
 
 # ─── Image & AI Logic ───────────────────────────────────────────────────────
@@ -357,9 +358,6 @@ def format_report_html(result):
     </div>
     """
 
-
-
-
 @app.route("/credits", methods=["GET"])
 def credits_check():
     email_addr = request.args.get("email", "").strip().lower()
@@ -393,7 +391,6 @@ def direct_upload():
     except Exception as e:
         log.exception("Upload analysis error")
         return jsonify({"error": str(e)}), 500
-
 
 @app.route("/lemonsqueezy/webhook", methods=["POST"])
 def lemonsqueezy_webhook():
