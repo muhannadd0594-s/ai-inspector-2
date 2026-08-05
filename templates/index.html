@@ -660,12 +660,13 @@ async function submitUpload() {
     displayError('يرجى اختيار صورة واحدة على الأقل'); return; 
   }
 
-  /* معالجة الإيميلات المحمية */
   let userSecretCode = '';
+
+  // 1. التحقق المسبق في الفرونت إند من قائمة الإيميلات المحمية
   if (typeof PROTECTED_EMAILS !== 'undefined' && PROTECTED_EMAILS.includes(email)) {
-    const entered = prompt('⚠️ هذا البريد محمي.\nأدخل الرمز السري للمتابعة:');
+    const entered = prompt('🔒 هذا الحساب محمي.\nيرجى إدخال الرمز السري للمتابعة:');
     if (entered === null) return; // تم الإلغاء
-    if (entered.trim() === '') { displayError('الرمز السري مطلوب.'); return; }
+    if (entered.trim() === '') { displayError('الرمز السري مطلوب للمتابعة.'); return; }
     userSecretCode = entered.trim();
   }
 
@@ -673,31 +674,46 @@ async function submitUpload() {
   spinner.classList.remove('hidden');
   btnText.textContent = 'جاري الفحص...';
 
-  const form = new FormData();
-  form.append('email', email);
-  form.append('description', desc);
-  
-  if (userSecretCode) form.append('secret_code', userSecretCode);
+  // دالة مساعدة لتجهيز وإرسال الطلب (لتسهيل إعادة الإرسال لو لزم الأمر)
+  const sendRequest = async (secret) => {
+    const form = new FormData();
+    form.append('email', email);
+    form.append('description', desc);
+    if (secret) form.append('secret_code', secret);
 
-  selectedFiles.forEach(f => form.append('image', f));
+    selectedFiles.forEach(f => form.append('image', f));
 
-  // الشعار المخصص (اختياري)
-  const logoInput = document.getElementById('upload-logo');
-  if (logoInput && logoInput.files.length > 0) {
-    form.append('custom_logo', logoInput.files[0]);
-  }
+    const logoInput = document.getElementById('upload-logo');
+    if (logoInput && logoInput.files.length > 0) {
+      form.append('custom_logo', logoInput.files[0]);
+    }
+
+    return await fetch('/upload', { method: 'POST', body: form });
+  };
 
   try {
-    const resp = await fetch('/upload', { method: 'POST', body: form });
+    let resp = await sendRequest(userSecretCode);
     
-    // معالجة الأخطاء الشائعة والـ 404
+    // 2. إذا رد السيرفر بـ 401 (يتطلب رمز سري)، نطلبه من المستخدم ونعيد الإرسال
+    if (resp.status === 401) {
+      const errorData = await resp.json();
+      const entered = prompt(`🔒 ${errorData.message || 'هذا الحساب محمي.'}\nيرجى إدخال الرمز السري:`);
+      if (entered && entered.trim() !== '') {
+        userSecretCode = entered.trim();
+        resp = await sendRequest(userSecretCode); // إعادة إرسال الطلب بالرمز الجديد
+      } else {
+        displayError('الرمز السري مطلوب للمتابعة.');
+        return;
+      }
+    }
+    
+    // معالجة باقي الأخطاء بعد الطلب النهائي
     if (resp.status === 404) {
       displayError('حدث خطأ 404: الخادم أو الرابط غير موجود.');
       return;
     }
     
-    // التعديل هنا: قراءة الرسالة القادمة من الباك إند
-    if (resp.status === 401 || resp.status === 403) {
+    if (resp.status === 403) {
       const errorData = await resp.json();
       displayError(errorData.message || 'الرمز السري غير صحيح أو أنك لا تملك صلاحية الوصول.');
       return;
@@ -710,9 +726,12 @@ async function submitUpload() {
     }
     
     const data = await resp.json();
-    if (!resp.ok || data.error) { displayError(data.error || 'حدث خطأ، حاول مرة أخرى'); return; }
+    if (!resp.ok || data.error) { 
+      displayError(data.message || data.error || 'حدث خطأ، حاول مرة أخرى'); 
+      return; 
+    }
 
-    /* حفظ البيانات من أجل الـ PDF */
+    /* حفظ البيانات وعرض التقرير */
     window._lastReportHtml   = data.report;
     window._lastDesc         = desc || 'تقرير فحص المنتج';
     window._lastImagesB64    = data.images_b64 || [];
