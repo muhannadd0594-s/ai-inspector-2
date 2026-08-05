@@ -469,6 +469,12 @@ let currentPhotoLimit = 1;
 let isExempt          = false;
 let selectedFiles     = [];   // Array of File objects for product images
 
+// 🟢 الحل هنا: تعريف قائمة الإيميلات المحمية/المستثناة لتفادي خطأ undefined
+const PROTECTED_EMAILS = [
+  "akashiiso04@gmail.com",
+  "muhannadd0594@gmail.com",
+  "mohammdlghmd@gmail.com"
+];
 
 /* ════ Modals ════ */
 function openModal(id)  { document.getElementById(id).classList.add('open');    document.body.style.overflow='hidden'; }
