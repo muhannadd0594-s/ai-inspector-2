@@ -219,7 +219,7 @@ def analyze_image(image_bytes, caption, subject):
         ]
     }
 
-  try:
+    try:
         resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=payload,
