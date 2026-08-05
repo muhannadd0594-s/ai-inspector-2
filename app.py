@@ -7,7 +7,7 @@ import hashlib
 import hmac
 import io
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify, render_template, 
+from flask import Flask, request, jsonify, render_template  # تم تصحيح السطر هنا
 import requests
 from dotenv import load_dotenv
 from PIL import Image
@@ -17,6 +17,11 @@ load_dotenv()
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("ai-inspector")
+
+# === أضف هذا المسار ليعرض ملف templates/index.html عند زيارة الموقع ===
+@app.route('/')
+def home():
+    return render_template('index.html')
 
 # ─── Configuration & Credentials ───────────────────────────────────────────
 OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
