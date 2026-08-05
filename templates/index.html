@@ -760,7 +760,7 @@ async function submitUpload() {
   // إرسال الرمز السري للسيرفر ليتأكد منه
   if (userSecretCode) form.append('secret_code', userSecretCode);
 
-  selectedFiles.forEach(f => form.append('images', f));
+ selectedFiles.forEach(f => form.append('image', f));
 
   // الشعار المخصص (اختياري)
   const logoInput = document.getElementById('upload-logo');
