@@ -195,42 +195,31 @@ CRITICAL:
     return base + cat + user
 
 def analyze_image(image_bytes, caption, subject):
-    if not OPENROUTER_API_KEY:
-        log.error("OPENROUTER_API_KEY is missing from environment variables!")
-        return {
-            "image_quality": "unusable",
-            "quality_note": "مفتاح التشغيل غير متوفر.",
-            "overall_score": 0,
-            "verdict_title": "خطأ إعدادات",
-            "verdict_status": "danger",
-            "metrics": [],
-            "observations": [],
-            "summary_for_user": "تعذر إجراء الفحص بسبب خطأ في الإعدادات."
-        }
-
-    compressed = compress_image(image_bytes)
-    b64        = base64.b64encode(compressed).decode()
-    prompt     = get_dynamic_prompt(subject, caption)
-
+    # تحويل الصورة إلى base64 لكي تفهمها واجهة OpenRouter (مثل نموذج GPT-4o أو Claude)
+    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+    
     payload = {
-        "models": [
-            "anthropic/claude-3.5-sonnet",
-            "google/gemini-2.0-flash-001",
-            "openai/gpt-4o-mini"
-        ],
-        "temperature": 0.2,
+        "model": "openai/gpt-4o",  # تأكد من وضع نموذجك المفضل الذي يدعم الرؤية
         "messages": [
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
+                    {
+                        "type": "text", 
+                        "text": f"الوصف: {caption}\nالموضوع: {subject}\nقم بتحليل الصورة وأعد الناتج كـ JSON حصرياً."
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{base64_image}"
+                        }
+                    }
                 ]
             }
         ]
     }
 
-  try:
+    try:
         resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=payload,
@@ -247,7 +236,7 @@ def analyze_image(image_bytes, caption, subject):
         log.error("OpenRouter API Error: %s", str(e))
         raise
 
-    raw   = resp.json()["choices"][0]["message"]["content"]
+    raw = resp.json()["choices"][0]["message"]["content"]
     clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
 
     try:
