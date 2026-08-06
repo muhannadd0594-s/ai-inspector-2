@@ -168,8 +168,11 @@ def get_dynamic_prompt(subject, caption):
 }
 CRITICAL:
 1. جميع النصوص داخل JSON تكون باللغة العربية الفصحى الاحترافية حصراً.
-2. التقييمات تكون واقعية، دقيقة، ومبنية على تحليل بصري عميق (بين 20% إلى 95%).
-3. تقديم تفاصيل غنية وملاحظات تحليلية دقيقة في كل خانة."""
+2. التقييمات تكون واقعية، دقيقة، ومبنية على تحليل بصري عميق (بين 30% إلى 95%).
+3. تقديم تفاصيل غنية وملاحظات تحليلية دقيقة في كل خانة.
+4. ضع image_quality="good" دائماً إلا إذا كانت الصورة سوداء أو ضبابية تماماً بحيث يستحيل رؤية أي شيء. أي صورة تظهر المنتج يجب أن تكون "good".
+5. يجب أن تحتوي metrics على 4 معايير على الأقل مع تقييم رقمي دقيق لكل منها.
+6. يجب أن تحتوي observations على 3 ملاحظات على الأقل (إيجابية ك note أو سلبية)."""
 
     if any(w in combined for w in ["جوال","ايفون","لابتوب","شاشة","ايباد","phone","electronics"]):
         cat = "\n\nFocus (Electronics): screen scratches, damaged corners, camera module condition, back glass integrity, and hardware wear."
@@ -207,7 +210,7 @@ def analyze_image(image_bytes, caption, subject):
 
     try:
         resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
+            "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)",
             json=payload,
             headers={
                 "Authorization": f"Bearer {OPENROUTER_API_KEY}",
@@ -241,7 +244,7 @@ def analyze_image(image_bytes, caption, subject):
         }
 
 # ─── Report HTML ────────────────────────────────────────────────────────────
-def format_report_html(result):
+def format_report_html(result, logo_b64=None):
     status = result.get("verdict_status", "warning")
     color_map = {
         "success": {"badge_bg": "rgba(34,197,94,0.15)",  "border": "#22c55e", "text": "#4ade80"},
@@ -250,16 +253,20 @@ def format_report_html(result):
     }
     theme = color_map.get(status, color_map["warning"])
 
+    quality_warning = ""
     if result.get("image_quality") in ("poor", "unusable"):
         note = result.get("quality_note", "الصورة المرفوقة غير واضحة بشكل كافٍ.")
-        return f"""
-        <div dir="rtl" style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;
-             color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;text-align:right;">
-          <div style="background:rgba(239,68,68,0.15);border:1px solid #ef4444;border-radius:8px;
-               padding:15px;color:#fca5a5;font-weight:600;text-align:center;">
-            ⚠️ تعذر الفحص الدقيق: {note}
-          </div>
-        </div>"""
+        # إضافة كلاود: لا يتم حجب التقرير إلا إذا كانت المصفوفات فارغة تماماً
+        if not result.get("observations") and not result.get("metrics"):
+            return f"""
+            <div dir="rtl" style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;
+                 color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;text-align:right;">
+              <div style="background:rgba(239,68,68,0.15);border:1px solid #ef4444;border-radius:8px;
+                   padding:15px;color:#fca5a5;font-weight:600;text-align:center;">
+                ⚠️ تعذر الفحص الدقيق: {note}
+              </div>
+            </div>"""
+        quality_warning = f'<div style="background:rgba(234,179,8,0.15);border:1px solid #eab308;border-radius:8px;padding:10px 14px;color:#fde047;font-size:12px;margin-bottom:16px;">⚠️ {note}</div>'
 
     metrics_html = ""
     for m in result.get("metrics", []):
@@ -295,10 +302,17 @@ def format_report_html(result):
 
     score_val = min(max(int(result.get("overall_score", 70)), 0), 100)
 
+    # إضافة كلاود: دمج الشعار (اللوغو) داخل واجهة التقرير المرفوع
+    logo_html = ""
+    if logo_b64:
+        logo_html = f'<div style="text-align:center;margin-bottom:16px;padding:12px;background:#1e293b;border-radius:10px;border:1px solid #1e293b;"><img src="data:image/png;base64,{logo_b64}" style="max-height:56px;max-width:180px;object-fit:contain;" alt="شعار المتجر"></div>'
+
     return f"""
     <div dir="rtl" style="background:#0f172a;border:1px solid #1e293b;border-radius:16px;padding:24px;
          color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;max-width:650px;margin:auto;
          text-align:right;box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+      {logo_html}
+      {quality_warning}
       <div style="display:flex;justify-content:space-between;align-items:center;
            border-bottom:1px solid #1e293b;padding-bottom:18px;margin-bottom:20px;">
         <div>
@@ -379,10 +393,26 @@ def direct_upload():
     try:
         primary_image = next(f for f in image_files if f.filename != "")
         result = analyze_image(primary_image.read(), description, description)
+        
+        # إضافة كلاود: استقبال ومعالجة الشعار 
+        custom_logo_b64 = None
+        logo_file = request.files.get("custom_logo")
+        if logo_file and logo_file.filename:
+            try:
+                logo_bytes = logo_file.read()
+                logo_img = Image.open(io.BytesIO(logo_bytes))
+                if logo_img.mode in ("P",): logo_img = logo_img.convert("RGBA")
+                logo_img.thumbnail((240, 90), Image.Resampling.LANCZOS)
+                out = io.BytesIO()
+                logo_img.save(out, format="PNG")
+                custom_logo_b64 = base64.b64encode(out.getvalue()).decode()
+            except Exception as e:
+                log.error("Logo processing error: %s", e)
+
         user   = get_or_create_user(email_addr)
         return jsonify({
             "status":    "success",
-            "report":    format_report_html(result),
+            "report":    format_report_html(result, logo_b64=custom_logo_b64), # تمرير الشعار 
             "credits":   user["credits"],
             "cost":      cost,
             "plan":      user["plan"],
