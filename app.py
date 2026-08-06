@@ -209,17 +209,17 @@ def analyze_image(image_bytes, caption, subject):
     }
 
     try:
-        resp = requests.post(
-            "[https://openrouter.ai/api/v1/chat/completions](https://openrouter.ai/api/v1/chat/completions)",
-            json=payload,
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type":  "application/json",
-                "HTTP-Referer":  f"https://{SITE_URL}",
-                "X-Title":       "AI Product Inspector"
-            },
-            timeout=45
-        )
+       resp = requests.post(
+    "https://openrouter.ai/api/v1/chat/completions",
+    json=payload,
+    headers={
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type":  "application/json",
+        "HTTP-Referer":  f"https://{SITE_URL}",
+        "X-Title":       "AI Product Inspector"
+    },
+    timeout=45
+)
         resp.raise_for_status()
     except requests.RequestException as e:
         log.error("OpenRouter API Error: %s", str(e))
