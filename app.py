@@ -216,7 +216,7 @@ Give a unified overall_score that reflects all images combined."""
                 "HTTP-Referer":  f"https://{SITE_URL}",
                 "X-Title":       "AI Product Inspector"
             },
-            timeout=60
+            timeout=120
         )
         resp.raise_for_status()
     except requests.RequestException as e:
