@@ -189,23 +189,31 @@ CRITICAL:
     return base + cat + user
 
 # ─── AI analysis — THE FIX: always uses get_dynamic_prompt ─────────────────
-def analyze_image(image_bytes, caption, subject):
-    compressed   = compress_image(image_bytes)       # ضغط الصورة
-    b64          = base64.b64encode(compressed).decode()
-    prompt       = get_dynamic_prompt(subject, caption)  # البرومبت الاحترافي الكامل
+def analyze_image(images_bytes_list, caption, subject):
+    num = len(images_bytes_list)
+    prompt = get_dynamic_prompt(subject, caption)
+
+    # إضافة تعليمات للـ AI عند وجود صور متعددة
+    if num > 1:
+        prompt += f"""
+
+IMPORTANT — MULTI-IMAGE INSPECTION:
+The user has uploaded {num} images of the SAME product from different angles.
+Your job is to analyze ALL {num} images together as one comprehensive inspection.
+In your observations, clearly specify which image revealed which defect.
+Use labels like: "الصورة الأولى:", "الصورة الثانية:", "الصورة الثالثة:", "الصورة الرابعة:"
+Give a unified overall_score that reflects all images combined."""
+
+    content = [{"type": "text", "text": prompt}]
+    for img_bytes in images_bytes_list:
+        compressed = compress_image(img_bytes)
+        b64 = base64.b64encode(compressed).decode()
+        content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
 
     payload = {
         "model": "google/gemini-2.5-pro",
         "temperature": 0.2,
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text",      "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}}
-                ]
-            }
-        ]
+        "messages": [{"role": "user", "content": content}]
     }
 
     try:
@@ -398,8 +406,9 @@ def direct_upload():
         db.commit()
 
     try:
-        primary_image = next(f for f in image_files if f.filename != "")
-        result = analyze_image(primary_image.read(), description, description)
+       valid_files = [f for f in image_files if f.filename != ""]
+        images_bytes_list = [f.read() for f in valid_files]
+        result = analyze_image(images_bytes_list, description, description)
         
         # إضافة كلاود: استقبال ومعالجة الشعار 
         custom_logo_b64 = None
