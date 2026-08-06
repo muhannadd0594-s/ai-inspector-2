@@ -18,12 +18,10 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("ai-inspector")
 
-# === المسار الرئيسي لعرض واجهة المستخدم ===
 @app.route('/')
 def home():
     return render_template('index.html')
 
-# ─── Configuration & Credentials ───────────────────────────────────────────
 OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
 LEMONSQUEEZY_SECRET = os.environ.get("LEMONSQUEEZY_SECRET", "")
 ADMIN_SECRET_CODE   = os.environ.get("ADMIN_SECRET_CODE", "").strip()
@@ -31,7 +29,6 @@ SITE_URL            = "editchecker.com"
 DB_PATH             = os.environ.get("DB_PATH", "/tmp/inspector.db")
 FREE_CREDITS        = 3
 
-# ─── Exempt emails ─────────────────────────────────────────────────────────
 EXEMPT_CREDITS = 999
 EXEMPT_EMAILS = {
     "akashiiso04@gmail.com",
@@ -39,14 +36,12 @@ EXEMPT_EMAILS = {
     "mohammdlghmd@gmail.com",
 }
 
-# ─── LemonSqueezy Variant IDs ───────────────────────────────────────────────
 PLAN_CREDITS = {
     "e810b85b-5273-4da2-9477-f3cf62f9737d": ("basic", 10),
     "db680fa5-9ec4-4fed-81fe-0ad4928266c3": ("pro",   50),
     "ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072": ("vip",  120),
 }
 
-# ─── Database ───────────────────────────────────────────────────────────────
 def get_db():
     if "db" not in g:
         g.db = sqlite3.connect(DB_PATH)
@@ -114,8 +109,7 @@ def add_vip_credits(email_addr):
         return
     get_or_create_user(email_addr)
     db = get_db()
-    db.execute("""UPDATE users SET credits=MIN(credits+120, 200), plan='vip', updated_at=?
-                  WHERE email=?""",
+    db.execute("UPDATE users SET credits=MIN(credits+120, 200), plan='vip', updated_at=? WHERE email=?",
                (datetime.now(timezone.utc).isoformat(), email_addr))
     db.commit()
     log.info("VIP credits added for %s (cap 200)", email_addr)
@@ -130,7 +124,6 @@ def add_credits(email_addr, plan, amount):
                (amount, plan, datetime.now(timezone.utc).isoformat(), email_addr))
     db.commit()
 
-# ─── Image helpers ──────────────────────────────────────────────────────────
 def compress_image(image_bytes, max_size=(800, 800)):
     try:
         img = Image.open(io.BytesIO(image_bytes))
@@ -144,7 +137,6 @@ def compress_image(image_bytes, max_size=(800, 800)):
         log.error("compress_image error: %s", e)
         return image_bytes
 
-# ─── Prompt builder ─────────────────────────────────────────────────────────
 def get_dynamic_prompt(subject, caption):
     combined = f"{subject} {caption}".lower()
     base = """أنت خبير محترف ومعتمد في فحص جودة المنتجات وتوثيق حالة السلع بدقة فائقة.
@@ -170,9 +162,9 @@ CRITICAL:
 1. جميع النصوص داخل JSON تكون باللغة العربية الفصحى الاحترافية حصراً.
 2. التقييمات تكون واقعية، دقيقة، ومبنية على تحليل بصري عميق (بين 30% إلى 95%).
 3. تقديم تفاصيل غنية وملاحظات تحليلية دقيقة في كل خانة.
-4. ضع image_quality="good" دائماً إلا إذا كانت الصورة سوداء أو ضبابية تماماً بحيث يستحيل رؤية أي شيء. أي صورة تظهر المنتج يجب أن تكون "good".
+4. ضع image_quality="good" دائماً إلا إذا كانت الصورة سوداء أو ضبابية تماماً بحيث يستحيل رؤية أي شيء.
 5. يجب أن تحتوي metrics على 4 معايير على الأقل مع تقييم رقمي دقيق لكل منها.
-6. يجب أن تحتوي observations على 3 ملاحظات على الأقل (إيجابية ك note أو سلبية)."""
+6. يجب أن تحتوي observations على 3 ملاحظات على الأقل (إيجابية كـ note أو سلبية)."""
 
     if any(w in combined for w in ["جوال","ايفون","لابتوب","شاشة","ايباد","phone","electronics"]):
         cat = "\n\nFocus (Electronics): screen scratches, damaged corners, camera module condition, back glass integrity, and hardware wear."
@@ -188,20 +180,18 @@ CRITICAL:
     user = f'\n\nSeller caption:\n"{caption}"' if caption else ""
     return base + cat + user
 
-# ─── AI analysis — THE FIX: always uses get_dynamic_prompt ─────────────────
 def analyze_image(images_bytes_list, caption, subject):
-    num = len(images_bytes_list)
+    num    = len(images_bytes_list)
     prompt = get_dynamic_prompt(subject, caption)
 
-    # إضافة تعليمات للـ AI عند وجود صور متعددة
     if num > 1:
         prompt += f"""
 
 IMPORTANT — MULTI-IMAGE INSPECTION:
 The user has uploaded {num} images of the SAME product from different angles.
-Your job is to analyze ALL {num} images together as one comprehensive inspection.
-In your observations, clearly specify which image revealed which defect.
-Use labels like: "الصورة الأولى:", "الصورة الثانية:", "الصورة الثالثة:", "الصورة الرابعة:"
+Analyze ALL {num} images together as one comprehensive inspection.
+In observations, specify which image revealed which defect using labels:
+"الصورة الأولى:", "الصورة الثانية:", "الصورة الثالثة:", "الصورة الرابعة:"
 Give a unified overall_score that reflects all images combined."""
 
     content = [{"type": "text", "text": prompt}]
@@ -222,11 +212,11 @@ Give a unified overall_score that reflects all images combined."""
             json=payload,
             headers={
                 "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": f"https://{SITE_URL}",
-                "X-Title": "AI Product Inspector"
+                "Content-Type":  "application/json",
+                "HTTP-Referer":  f"https://{SITE_URL}",
+                "X-Title":       "AI Product Inspector"
             },
-            timeout=45
+            timeout=60
         )
         resp.raise_for_status()
     except requests.RequestException as e:
@@ -248,19 +238,18 @@ Give a unified overall_score that reflects all images combined."""
     except json.JSONDecodeError:
         log.error("JSON parse error: %s", raw)
         return {
-            "image_quality": "unusable",
-            "quality_note": "تعذر تحليل الاستجابة بشكل صحيح.",
-            "overall_score": 50,
-            "verdict_title": "تحليل غير مكتمل",
+            "image_quality":  "unusable",
+            "quality_note":   "تعذر تحليل الاستجابة بشكل صحيح.",
+            "overall_score":  50,
+            "verdict_title":  "تحليل غير مكتمل",
             "verdict_status": "warning",
-            "metrics": [],
-            "observations": [],
+            "metrics":        [],
+            "observations":   [],
             "summary_for_user": "حدث خطأ أثناء معالجة بيانات الفحص. يُرجى إعادة المحاولة."
         }
 
-# ─── Report HTML ────────────────────────────────────────────────────────────
 def format_report_html(result, logo_b64=None):
-    status = result.get("verdict_status", "warning")
+    status    = result.get("verdict_status", "warning")
     color_map = {
         "success": {"badge_bg": "rgba(34,197,94,0.15)",  "border": "#22c55e", "text": "#4ade80"},
         "warning": {"badge_bg": "rgba(234,179,8,0.15)",  "border": "#eab308", "text": "#fde047"},
@@ -271,65 +260,42 @@ def format_report_html(result, logo_b64=None):
     quality_warning = ""
     if result.get("image_quality") in ("poor", "unusable"):
         note = result.get("quality_note", "الصورة المرفوقة غير واضحة بشكل كافٍ.")
-        # إضافة كلاود: لا يتم حجب التقرير إلا إذا كانت المصفوفات فارغة تماماً
         if not result.get("observations") and not result.get("metrics"):
-            return f"""
-            <div dir="rtl" style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;
-                 color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;text-align:right;">
-              <div style="background:rgba(239,68,68,0.15);border:1px solid #ef4444;border-radius:8px;
-                   padding:15px;color:#fca5a5;font-weight:600;text-align:center;">
-                ⚠️ تعذر الفحص الدقيق: {note}
-              </div>
-            </div>"""
+            return f"""<div dir="rtl" style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:20px;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;text-align:right;">
+              <div style="background:rgba(239,68,68,0.15);border:1px solid #ef4444;border-radius:8px;padding:15px;color:#fca5a5;font-weight:600;text-align:center;">⚠️ تعذر الفحص الدقيق: {note}</div></div>"""
         quality_warning = f'<div style="background:rgba(234,179,8,0.15);border:1px solid #eab308;border-radius:8px;padding:10px 14px;color:#fde047;font-size:12px;margin-bottom:16px;">⚠️ {note}</div>'
 
     metrics_html = ""
     for m in result.get("metrics", []):
         score = min(max(int(m.get("score", 50)), 0), 100)
-        metrics_html += f"""
-        <div style="margin-bottom:12px;">
+        metrics_html += f"""<div style="margin-bottom:12px;">
           <div style="display:flex;justify-content:space-between;font-size:13px;color:#cbd5e1;margin-bottom:4px;">
-            <span>{m.get('name','معيار الفحص')}</span>
-            <span style="font-weight:bold;color:#f8fafc;">{score}%</span>
+            <span>{m.get('name','معيار الفحص')}</span><span style="font-weight:bold;color:#f8fafc;">{score}%</span>
           </div>
           <div style="background:#334155;height:6px;border-radius:3px;overflow:hidden;">
             <div style="background:{theme['border']};width:{score}%;height:100%;border-radius:3px;"></div>
-          </div>
-        </div>"""
+          </div></div>"""
 
-    icons = {
-        "damage":      ("❌", "#ef4444"),
-        "discrepancy": ("⚠️", "#eab308"),
-        "note":        ("💡", "#3b82f6"),
-    }
+    icons = {"damage":("❌","#ef4444"),"discrepancy":("⚠️","#eab308"),"note":("💡","#3b82f6")}
     obs_html = ""
     for o in result.get("observations", []):
         icon, oc = icons.get(o.get("type","note"), ("📌","#94a3b8"))
-        obs_html += f"""
-        <div style="background:#1e293b;border-right:3px solid {oc};padding:10px 12px;
-             border-radius:4px 8px 8px 4px;margin-bottom:8px;">
+        obs_html += f"""<div style="background:#1e293b;border-right:3px solid {oc};padding:10px 12px;border-radius:4px 8px 8px 4px;margin-bottom:8px;">
           <div style="font-size:14px;font-weight:bold;color:#f8fafc;margin-bottom:2px;">{icon} {o.get('title','ملاحظة')}</div>
-          <div style="font-size:13px;color:#94a3b8;line-height:1.4;">{o.get('description','')}</div>
-        </div>"""
+          <div style="font-size:13px;color:#94a3b8;line-height:1.4;">{o.get('description','')}</div></div>"""
 
     if not obs_html:
         obs_html = '<div style="font-size:13px;color:#94a3b8;text-align:center;">لم يتم تسجيل أي عيوب أو ملاحظات سلبية ظاهرة.</div>'
 
     score_val = min(max(int(result.get("overall_score", 70)), 0), 100)
 
-    # إضافة كلاود: دمج الشعار (اللوغو) داخل واجهة التقرير المرفوع
     logo_html = ""
     if logo_b64:
-        logo_html = f'<div style="text-align:center;margin-bottom:16px;padding:12px;background:#1e293b;border-radius:10px;border:1px solid #1e293b;"><img src="data:image/png;base64,{logo_b64}" style="max-height:56px;max-width:180px;object-fit:contain;" alt="شعار المتجر"></div>'
+        logo_html = f'<div style="text-align:center;margin-bottom:16px;padding:12px;background:#1e293b;border-radius:10px;border:1px solid #334155;"><img src="data:image/png;base64,{logo_b64}" style="max-height:56px;max-width:180px;object-fit:contain;" alt="شعار المتجر"></div>'
 
-    return f"""
-    <div dir="rtl" style="background:#0f172a;border:1px solid #1e293b;border-radius:16px;padding:24px;
-         color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;max-width:650px;margin:auto;
-         text-align:right;box-shadow:0 10px 25px rgba(0,0,0,0.3);">
-      {logo_html}
-      {quality_warning}
-      <div style="display:flex;justify-content:space-between;align-items:center;
-           border-bottom:1px solid #1e293b;padding-bottom:18px;margin-bottom:20px;">
+    return f"""<div dir="rtl" style="background:#0f172a;border:1px solid #1e293b;border-radius:16px;padding:24px;color:#f8fafc;font-family:system-ui,-apple-system,sans-serif;max-width:650px;margin:auto;text-align:right;box-shadow:0 10px 25px rgba(0,0,0,0.3);">
+      {logo_html}{quality_warning}
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:18px;margin-bottom:20px;">
         <div>
           <span style="font-size:12px;font-weight:600;color:#94a3b8;">تقرير الفحص الذكي الاحترافي</span>
           <h3 style="margin:4px 0 0 0;font-size:18px;color:{theme['text']};font-weight:bold;">{result.get('verdict_title','نتيجة الفحص')}</h3>
@@ -353,17 +319,15 @@ def format_report_html(result, logo_b64=None):
       </div>
       <div style="font-size:10px;color:#64748b;text-align:center;margin-top:16px;border-top:1px solid #1e293b;padding-top:10px;">
         هذا التقرير الاحترافي صادر من الذكاء الاصطناعي بناءً على الفحص البصري والتحليل المتقدم للصورة المرفقة.
-      </div>
-    </div>"""
+      </div></div>"""
 
-# ─── Endpoints ──────────────────────────────────────────────────────────────
 @app.route("/credits", methods=["GET"])
 def credits_check():
     email_addr = request.args.get("email", "").strip().lower()
     if not email_addr:
         return jsonify({"error": "email required"}), 400
     user = get_or_create_user(email_addr)
-    photo_limit_map = {"free":1, "basic":1, "pro":2, "vip":4, "exempt":4}
+    photo_limit_map = {"free":1,"basic":1,"pro":2,"vip":4,"exempt":4}
     return jsonify({
         "credits":     user["credits"],
         "plan":        user["plan"],
@@ -376,14 +340,16 @@ def direct_upload():
     email_addr        = request.form.get("email", "").strip().lower()
     description       = request.form.get("description", "")
     secret_code_input = request.form.get("secret_code", "").strip()
-    image_files       = request.files.getlist("image")
+
+    # ── الإصلاح الوحيد: قبول اسمَي الحقل معاً ──
+    # الـ HTML يرسل 'images'، نسخ قديمة أرسلت 'image'
+    image_files = request.files.getlist("images") or request.files.getlist("image")
 
     if not email_addr:
         return jsonify({"error": "البريد الإلكتروني مطلوب"}), 400
     if not image_files or all(f.filename == "" for f in image_files):
         return jsonify({"error": "لم يتم رفع أي صورة"}), 400
 
-    # التحقق من الرمز السري للإيميلات المحمية
     if is_exempt(email_addr):
         log.info("Exempt email: %s | Code loaded: %s", email_addr, bool(ADMIN_SECRET_CODE))
         if not secret_code_input:
@@ -392,8 +358,9 @@ def direct_upload():
             log.warning("Bad secret code for %s", email_addr)
             return jsonify({"error": "invalid_secret", "message": "الرمز السري غير صحيح"}), 403
 
-    num_images = len([f for f in image_files if f.filename != ""])
-    cost       = max(1, num_images // 2)
+    valid_files = [f for f in image_files if f.filename != ""]
+    num_images  = len(valid_files)
+    cost        = max(1, num_images // 2)
 
     user = get_or_create_user(email_addr)
     if not is_exempt(email_addr) and user["credits"] < cost:
@@ -406,7 +373,6 @@ def direct_upload():
         db.commit()
 
     try:
-        valid_files = [f for f in image_files if f.filename != ""]
         images_bytes_list = [f.read() for f in valid_files]
         result = analyze_image(images_bytes_list, description, description)
 
@@ -415,7 +381,7 @@ def direct_upload():
         if logo_file and logo_file.filename:
             try:
                 logo_bytes = logo_file.read()
-                logo_img = Image.open(io.BytesIO(logo_bytes))
+                logo_img   = Image.open(io.BytesIO(logo_bytes))
                 if logo_img.mode in ("P",):
                     logo_img = logo_img.convert("RGBA")
                 logo_img.thumbnail((240, 90), Image.Resampling.LANCZOS)
@@ -467,13 +433,16 @@ def lemonsqueezy_webhook():
                 return jsonify({"status": "unknown_plan"}), 200
             plan_name, credits = plan_info
             add_credits(customer_email, plan_name, credits)
+            log.info("Granted %d credits (%s) to %s", credits, plan_name, customer_email)
             return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
 
         elif event_name in ("subscription_created", "subscription_payment_success"):
             add_vip_credits(customer_email)
+            log.info("VIP updated for %s", customer_email)
             return jsonify({"status": "vip_updated"}), 200
 
         elif event_name in ("subscription_cancelled", "subscription_expired", "subscription_payment_failed"):
+            log.info("VIP ended for %s", customer_email)
             return jsonify({"status": "cancelled"}), 200
 
         return jsonify({"status": "ignored"}), 200
