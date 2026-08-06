@@ -212,9 +212,9 @@ Give a unified overall_score that reflects all images combined."""
             json=payload,
             headers={
                 "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type":  "application/json",
-                "HTTP-Referer":  f"https://{SITE_URL}",
-                "X-Title":       "AI Product Inspector"
+                "Content-Type": "application/json",
+                "HTTP-Referer": f"https://{SITE_URL}",
+                "X-Title": "AI Product Inspector"
             },
             timeout=120
         )
