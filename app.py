@@ -406,18 +406,18 @@ def direct_upload():
         db.commit()
 
        try:
-       valid_files = [f for f in image_files if f.filename != ""]
+        valid_files = [f for f in image_files if f.filename != ""]
         images_bytes_list = [f.read() for f in valid_files]
         result = analyze_image(images_bytes_list, description, description)
-        
-        # إضافة كلاود: استقبال ومعالجة الشعار 
+
         custom_logo_b64 = None
         logo_file = request.files.get("custom_logo")
         if logo_file and logo_file.filename:
             try:
                 logo_bytes = logo_file.read()
                 logo_img = Image.open(io.BytesIO(logo_bytes))
-                if logo_img.mode in ("P",): logo_img = logo_img.convert("RGBA")
+                if logo_img.mode in ("P",):
+                    logo_img = logo_img.convert("RGBA")
                 logo_img.thumbnail((240, 90), Image.Resampling.LANCZOS)
                 out = io.BytesIO()
                 logo_img.save(out, format="PNG")
@@ -425,10 +425,10 @@ def direct_upload():
             except Exception as e:
                 log.error("Logo processing error: %s", e)
 
-        user   = get_or_create_user(email_addr)
+        user = get_or_create_user(email_addr)
         return jsonify({
             "status":    "success",
-            "report":    format_report_html(result, logo_b64=custom_logo_b64), # تمرير الشعار 
+            "report":    format_report_html(result, logo_b64=custom_logo_b64),
             "credits":   user["credits"],
             "cost":      cost,
             "plan":      user["plan"],
