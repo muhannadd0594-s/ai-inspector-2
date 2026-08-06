@@ -405,7 +405,7 @@ def direct_upload():
                    (cost, datetime.now(timezone.utc).isoformat(), email_addr))
         db.commit()
 
-       try:
+    try:
         valid_files = [f for f in image_files if f.filename != ""]
         images_bytes_list = [f.read() for f in valid_files]
         result = analyze_image(images_bytes_list, description, description)
