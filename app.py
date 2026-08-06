@@ -195,7 +195,7 @@ def analyze_image(image_bytes, caption, subject):
     prompt       = get_dynamic_prompt(subject, caption)  # البرومبت الاحترافي الكامل
 
     payload = {
-        "model": "openai/gpt-4o",
+        "model": "google/gemini-2.5-pro",
         "temperature": 0.2,
         "messages": [
             {
@@ -225,8 +225,18 @@ def analyze_image(image_bytes, caption, subject):
         log.error("OpenRouter API Error: %s", str(e))
         raise
 
-    raw   = resp.json()["choices"][0]["message"]["content"]
-    clean = raw.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
+  raw   = resp.json()["choices"][0]["message"]["content"]
+    clean = raw.strip()
+
+    if "```json" in clean:
+        clean = clean.split("```json")[1].split("```")[0].strip()
+    elif "```" in clean:
+        clean = clean.split("```")[1].split("```")[0].strip()
+
+    start = clean.find("{")
+    end   = clean.rfind("}") + 1
+    if start != -1 and end > start:
+        clean = clean[start:end]
 
     try:
         return json.loads(clean)
