@@ -261,17 +261,17 @@ for img_bytes in images_bytes_list:
 
         
         try:
-            # مسافة 8 ضغطات Space هنا
-            return json.loads(clean)
-        except json.JSONDecodeError:
-            # مسافة 8 ضغطات Space هنا
-            log.error("JSON parse error: %s", raw[:300])
-            return {
-                "image_quality": "unusable", "quality_note": "تعذر تحليل الاستجابة.",
-                "overall_score": 50, "verdict_title": "تحليل غير مكتمل",
-                "verdict_status": "warning", "metrics": [], "observations": [],
-                "summary_for_user": "حدث خطأ أثناء المعالجة. يُرجى إعادة المحاولة.",
-            }
+        # مسافة 8 ضغطات Space هنا
+        return json.loads(clean)
+    except json.JSONDecodeError:
+        # مسافة 8 ضغطات Space هنا
+        log.error("JSON parse error: %s", raw[:300])
+        return {
+            "image_quality": "unusable", "quality_note": "تعذر تحليل الاستجابة.",
+            "overall_score": 50, "verdict_title": "تحليل غير مكتمل",
+            "verdict_status": "warning", "metrics": [], "observations": [],
+            "summary_for_user": "حدث خطأ أثناء المعالجة. يُرجى إعادة المحاولة.",
+        }
 
 
 # ─── Report HTML ─────────────────────────────────────────────────────────────
