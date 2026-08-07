@@ -209,27 +209,23 @@ In observations, specify which image revealed which detail using:
 "الصورة الأولى:", "الصورة الثانية:", "الصورة الثالثة:", "الصورة الرابعة:"
 Give a unified overall_score that reflects all images combined."""
 
-        # ضغط أقوى لـ 3+ صور لتجنب timeout
-    _sizes    = {1:(800,800), 2:(720,720), 3:(600,600), 4:(480,480)}
-    _quals    = {1:85,        2:80,        3:72,        4:60}
-    c_size    = _sizes.get(num, (480,480))
-    c_quality = _quals.get(num, 60)
-
-    content = [{"type": "text", "text": prompt}]
-# حساب إجمالي عدد الصور لتمريره لدالة الضغط
-total_images = len(images_bytes_list)
+    sizes = {1:(800,800), 2:(720,720), 3:(600,600), 4:(480,480)}
+quals = {1:85, 2:80, 3:72, 4:60}
 
 for img_bytes in images_bytes_list:
-    # تمرير عدد الصور فقط ليتم تحديد الجودة والحجم تلقائياً من داخل الدالة
-    compressed = compress_image(img_bytes, num_images=total_images)
+    compressed = compress_image(
+        img_bytes,
+        max_size=sizes.get(total_images, (480,480)),
+        quality=quals.get(total_images, 60)
+    )
     b64 = base64.b64encode(compressed).decode()
     content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
 
-    payload = {
-        "model": "google/gemini-2.5-pro",
-        "temperature": 0.2,
-        "messages": [{"role": "user", "content": content}],
-    }
+payload = {
+    "model": "google/gemini-2.5-pro",
+    "temperature": 0.2,
+    "messages": [{"role": "user", "content": content}],
+}
 
     try:
         resp = requests.post(
