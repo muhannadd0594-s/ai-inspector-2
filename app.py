@@ -209,25 +209,26 @@ In observations, specify which image revealed which detail using:
 "الصورة الأولى:", "الصورة الثانية:", "الصورة الثالثة:", "الصورة الرابعة:"
 Give a unified overall_score that reflects all images combined."""
 
-    sizes = {1:(800,800), 2:(720,720), 3:(600,600), 4:(480,480)}
-quals = {1:85, 2:80, 3:72, 4:60}
+    sizes = {1: (800,800), 2: (720,720), 3: (600,600), 4: (480,480)}
+    quals = {1: 85,        2: 80,        3: 72,        4: 60}
 
-for img_bytes in images_bytes_list:
-    compressed = compress_image(
-        img_bytes,
-        max_size=sizes.get(total_images, (480,480)),
-        quality=quals.get(total_images, 60)
-    )
-    b64 = base64.b64encode(compressed).decode()
-    content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
+    content = [{"type": "text", "text": prompt}]
+    for img_bytes in images_bytes_list:
+        compressed = compress_image(
+            img_bytes,
+            max_size=sizes.get(num, (480,480)),
+            quality=quals.get(num, 60),
+        )
+        b64 = base64.b64encode(compressed).decode()
+        content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
 
-payload = {
-    "model": "google/gemini-2.5-pro",
-    "temperature": 0.2,
-    "messages": [{"role": "user", "content": content}],
-}
+    payload = {
+        "model": "google/gemini-2.5-pro",
+        "temperature": 0.2,
+        "messages": [{"role": "user", "content": content}],
+    }
 
-try:
+    try:
         resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=payload,
@@ -240,7 +241,7 @@ try:
             timeout=120,
         )
         resp.raise_for_status()
-except requests.RequestException as e:
+    except requests.RequestException as e:
         log.error("OpenRouter API Error: %s", str(e))
         raise
 
@@ -255,12 +256,9 @@ except requests.RequestException as e:
     if s != -1 and e > s:
         clean = clean[s:e]
 
-        
-        try:
-        # مسافة 8 ضغطات Space هنا
+    try:
         return json.loads(clean)
     except json.JSONDecodeError:
-        # مسافة 8 ضغطات Space هنا
         log.error("JSON parse error: %s", raw[:300])
         return {
             "image_quality": "unusable", "quality_note": "تعذر تحليل الاستجابة.",
@@ -268,6 +266,7 @@ except requests.RequestException as e:
             "verdict_status": "warning", "metrics": [], "observations": [],
             "summary_for_user": "حدث خطأ أثناء المعالجة. يُرجى إعادة المحاولة.",
         }
+
 
 
 # ─── Report HTML ─────────────────────────────────────────────────────────────
