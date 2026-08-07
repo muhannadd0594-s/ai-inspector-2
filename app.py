@@ -227,7 +227,7 @@ payload = {
     "messages": [{"role": "user", "content": content}],
 }
 
-    try:
+try:
         resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=payload,
