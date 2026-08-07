@@ -240,7 +240,7 @@ try:
             timeout=120,
         )
         resp.raise_for_status()
-    except requests.RequestException as e:
+except requests.RequestException as e:
         log.error("OpenRouter API Error: %s", str(e))
         raise
 
