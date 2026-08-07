@@ -357,7 +357,7 @@ def _run_analysis_job(job_id, email_addr, images_bytes_list, description, cost, 
 
             report = format_report_html(result, logo_b64=custom_logo_b64)
 
-            # خصم الرصيد بعد نجاح التحليل
+            # --- الخصم يحدث هنا حصراً بعد نجاح التحليل التام ---
             if not is_exempt(email_addr):
                 db = get_db()
                 db.execute("UPDATE users SET credits=credits-?, updated_at=? WHERE email=?",
@@ -378,18 +378,10 @@ def _run_analysis_job(job_id, email_addr, images_bytes_list, description, cost, 
 
         except Exception as e:
             log.exception("Job %s failed", job_id)
-            # استرجاع الرصيد عند الفشل
-            if not is_exempt(email_addr):
-                try:
-                    db = get_db()
-                    db.execute("UPDATE users SET credits=credits+?, updated_at=? WHERE email=?",
-                               (cost, datetime.now(timezone.utc).isoformat(), email_addr))
-                    db.commit()
-                    log.info("Refunded %d credits to %s", cost, email_addr)
-                except Exception as re:
-                    log.error("Refund failed for %s: %s", email_addr, re)
+            # في حال حدوث أي خطأ في التحليل، فلن يتم خصم أي رصيد نهائياً
             with _jobs_lock:
                 _jobs[job_id].update({"status": "error", "error": str(e)})
+
 
 
 # ─── Routes ─────────────────────────────────────────────────────────────────
@@ -430,32 +422,30 @@ def direct_upload():
 
     user      = get_or_create_user(email_addr)
     photo_lim = PHOTO_LIMIT_MAP.get(user["plan"], 1)
+    
+    # التأكد من عدم تجاوز حد الصور المسموح به
     if num_images > photo_lim:
         return jsonify({"error": f"باقتك تسمح بـ {photo_lim} صور كحد أقصى"}), 400
 
     cost = max(1, math.ceil(num_images / 2))
+    
+    # التأكد من وجود رصيد كافٍ قبل البدء
     if not is_exempt(email_addr) and user["credits"] < cost:
         return jsonify({"error": "نفد رصيدك", "credits": user["credits"]}), 402
 
-    # قراءة الملفات الآن قبل إغلاق request context
     images_bytes = [f.read() for f in valid_files]
     logo_bytes   = None
     lf = request.files.get("custom_logo")
     if lf and lf.filename:
         logo_bytes = lf.read()
 
-    # حجز الرصيد مسبقاً (يُسترجع عند الفشل)
-    if not is_exempt(email_addr):
-        db = get_db()
-        db.execute("UPDATE users SET credits=credits-?, updated_at=? WHERE email=?",
-                   (cost, datetime.now(timezone.utc).isoformat(), email_addr))
-        db.commit()
-
+    # إنشاء معرف العملية لتتواصل معه الجافاسكريبت
     job_id = str(uuid.uuid4())
     _cleanup_old_jobs()
     with _jobs_lock:
         _jobs[job_id] = {"status": "pending", "ts": time.time()}
 
+    # تشغيل التحليل في الخلفية
     threading.Thread(
         target=_run_analysis_job,
         args=(job_id, email_addr, images_bytes, description, cost, logo_bytes),
@@ -463,12 +453,15 @@ def direct_upload():
     ).start()
 
     est = {1: 40, 2: 55, 3: 75, 4: 105}.get(num_images, 60)
+    
+    # إعادة job_id لمنع خطأ undefined
     return jsonify({
         "status":            "processing",
         "job_id":            job_id,
         "estimated_seconds": est,
         "num_images":        num_images,
     })
+
 
 
 @app.route("/status/<job_id>", methods=["GET"])
