@@ -7,6 +7,9 @@ import hashlib
 import hmac
 import io
 import math
+import threading
+import uuid
+import time
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template, g
 import requests
@@ -16,6 +19,11 @@ from PIL import Image
 load_dotenv()
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32 MB
+
+_jobs: dict = {}
+_jobs_lock  = threading.Lock()
+_JOB_TTL    = 1800  # 30 دقيقة
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("ai-inspector")
 
@@ -106,18 +114,19 @@ def add_credits(email_addr, plan, amount):
     db.commit()
 
 # ─── Image & AI ─────────────────────────────────────────────────────────────
-def compress_image(image_bytes, max_size=(800, 800)):
+def compress_image(image_bytes, max_size=(800, 800), quality=85):
     try:
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
         img.thumbnail(max_size, Image.Resampling.LANCZOS)
         out = io.BytesIO()
-        img.save(out, format="JPEG", quality=85)
+        img.save(out, format="JPEG", quality=quality)
         return out.getvalue()
     except Exception as e:
         log.error("compress_image error: %s", e)
         return image_bytes
+
 
 def get_dynamic_prompt(subject, caption):
     combined = f"{subject} {caption}".lower()
@@ -176,9 +185,13 @@ In observations, specify which image revealed which detail using:
 "الصورة الأولى:", "الصورة الثانية:", "الصورة الثالثة:", "الصورة الرابعة:"
 Give a unified overall_score that reflects all images combined."""
 
-    content = [{"type": "text", "text": prompt}]
-    for img_bytes in images_bytes_list:
-        compressed = compress_image(img_bytes)
+    # ضغط أقوى لـ 3+ صور لتجنب timeout
+c_size    = (640, 640) if num >= 3 else (800, 800)
+c_quality = 72         if num >= 3 else 85
+
+content = [{"type": "text", "text": prompt}]
+for img_bytes in images_bytes_list:
+    compressed = compress_image(img_bytes, max_size=c_size, quality=c_quality)
         b64 = base64.b64encode(compressed).decode()
         content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
 
@@ -311,6 +324,72 @@ def format_report_html(result, logo_b64=None):
         f'<div style="font-size:10px;color:#64748b;text-align:center;margin-top:16px;border-top:1px solid #1e293b;padding-top:10px;">'
         f'تحليل استرشادي آلي — القرار النهائي يعود إليك.</div></div>'
     )
+    
+    # ─── Background Job System ───────────────────────────────────────────────────
+
+def _cleanup_old_jobs():
+    now = time.time()
+    with _jobs_lock:
+        expired = [k for k, v in _jobs.items() if now - v.get("ts", now) > _JOB_TTL]
+        for k in expired:
+            del _jobs[k]
+
+
+def _run_analysis_job(job_id, email_addr, images_bytes_list, description, cost, logo_bytes):
+    with app.app_context():
+        try:
+            result = analyze_image(images_bytes_list, description, description)
+
+            # معالجة الشعار
+            custom_logo_b64 = None
+            if logo_bytes:
+                try:
+                    limg = Image.open(io.BytesIO(logo_bytes))
+                    if limg.mode == "P":
+                        limg = limg.convert("RGBA")
+                    limg.thumbnail((240, 90), Image.Resampling.LANCZOS)
+                    out = io.BytesIO()
+                    limg.save(out, format="PNG")
+                    custom_logo_b64 = base64.b64encode(out.getvalue()).decode()
+                except Exception as le:
+                    log.error("Logo job error: %s", le)
+
+            report = format_report_html(result, logo_b64=custom_logo_b64)
+
+            # خصم الرصيد بعد نجاح التحليل
+            if not is_exempt(email_addr):
+                db = get_db()
+                db.execute("UPDATE users SET credits=credits-?, updated_at=? WHERE email=?",
+                           (cost, datetime.now(timezone.utc).isoformat(), email_addr))
+                db.commit()
+
+            user = get_or_create_user(email_addr)
+            with _jobs_lock:
+                _jobs[job_id].update({
+                    "status":    "done",
+                    "report":    report,
+                    "credits":   user["credits"],
+                    "cost":      cost,
+                    "plan":      user["plan"],
+                    "is_exempt": is_exempt(email_addr),
+                })
+            log.info("Job %s done for %s", job_id, email_addr)
+
+        except Exception as e:
+            log.exception("Job %s failed", job_id)
+            # استرجاع الرصيد عند الفشل
+            if not is_exempt(email_addr):
+                try:
+                    db = get_db()
+                    db.execute("UPDATE users SET credits=credits+?, updated_at=? WHERE email=?",
+                               (cost, datetime.now(timezone.utc).isoformat(), email_addr))
+                    db.commit()
+                    log.info("Refunded %d credits to %s", cost, email_addr)
+                except Exception as re:
+                    log.error("Refund failed for %s: %s", email_addr, re)
+            with _jobs_lock:
+                _jobs[job_id].update({"status": "error", "error": str(e)})
+
 
 # ─── Routes ─────────────────────────────────────────────────────────────────
 @app.route("/credits", methods=["GET"])
@@ -331,79 +410,75 @@ def direct_upload():
     email_addr        = request.form.get("email", "").strip().lower()
     description       = request.form.get("description", "")
     secret_code_input = request.form.get("secret_code", "").strip()
-
-    # Accept both 'images' (new HTML) and 'image' (old HTML) field names
-    image_files = request.files.getlist("images") or request.files.getlist("image")
+    image_files       = request.files.getlist("images") or request.files.getlist("image")
 
     if not email_addr:
         return jsonify({"error": "البريد الإلكتروني مطلوب"}), 400
     if not image_files or all(f.filename == "" for f in image_files):
         return jsonify({"error": "لم يتم رفع أي صورة"}), 400
 
-    # Secret code check for exempt/admin accounts
     if is_exempt(email_addr):
         if not secret_code_input:
-            return jsonify({"error": "secret_required", "message": "هذا الحساب محمي، أدخل الرمز السري"}), 401
+            return jsonify({"error": "secret_required", "message": "أدخل الرمز السري"}), 401
         if not ADMIN_SECRET_CODE or secret_code_input != ADMIN_SECRET_CODE:
-            log.warning("Bad secret code for %s", email_addr)
+            log.warning("Bad secret for %s", email_addr)
             return jsonify({"error": "invalid_secret", "message": "الرمز السري غير صحيح"}), 403
 
     valid_files = [f for f in image_files if f.filename != ""]
     num_images  = len(valid_files)
 
-    # Photo limit check
     user      = get_or_create_user(email_addr)
-    plan      = user["plan"]
-    photo_lim = PHOTO_LIMIT_MAP.get(plan, 1)
+    photo_lim = PHOTO_LIMIT_MAP.get(user["plan"], 1)
     if num_images > photo_lim:
         return jsonify({"error": f"باقتك تسمح بـ {photo_lim} صور كحد أقصى"}), 400
 
     cost = max(1, math.ceil(num_images / 2))
-
-    # Credits check
     if not is_exempt(email_addr) and user["credits"] < cost:
         return jsonify({"error": "نفد رصيدك", "credits": user["credits"]}), 402
 
-    try:
-        images_bytes_list = [f.read() for f in valid_files]
-        result = analyze_image(images_bytes_list, description, description)
+    # قراءة الملفات الآن قبل إغلاق request context
+    images_bytes = [f.read() for f in valid_files]
+    logo_bytes   = None
+    lf = request.files.get("custom_logo")
+    if lf and lf.filename:
+        logo_bytes = lf.read()
 
-        # Deduct after successful analysis
-        if not is_exempt(email_addr):
-            db = get_db()
-            db.execute("UPDATE users SET credits=credits-?, updated_at=? WHERE email=?",
-                       (cost, datetime.now(timezone.utc).isoformat(), email_addr))
-            db.commit()
+    # حجز الرصيد مسبقاً (يُسترجع عند الفشل)
+    if not is_exempt(email_addr):
+        db = get_db()
+        db.execute("UPDATE users SET credits=credits-?, updated_at=? WHERE email=?",
+                   (cost, datetime.now(timezone.utc).isoformat(), email_addr))
+        db.commit()
 
-        # Process optional custom logo
-        custom_logo_b64 = None
-        logo_file = request.files.get("custom_logo")
-        if logo_file and logo_file.filename:
-            try:
-                logo_bytes = logo_file.read()
-                logo_img   = Image.open(io.BytesIO(logo_bytes))
-                if logo_img.mode == "P":
-                    logo_img = logo_img.convert("RGBA")
-                logo_img.thumbnail((240, 90), Image.Resampling.LANCZOS)
-                out = io.BytesIO()
-                logo_img.save(out, format="PNG")
-                custom_logo_b64 = base64.b64encode(out.getvalue()).decode()
-            except Exception as logo_err:
-                log.error("Logo processing error: %s", logo_err)
+    job_id = str(uuid.uuid4())
+    _cleanup_old_jobs()
+    with _jobs_lock:
+        _jobs[job_id] = {"status": "pending", "ts": time.time()}
 
-        user = get_or_create_user(email_addr)
-        return jsonify({
-            "status":    "success",
-            "report":    format_report_html(result, logo_b64=custom_logo_b64),
-            "credits":   user["credits"],
-            "cost":      cost,
-            "plan":      plan,
-            "is_exempt": is_exempt(email_addr),
-        })
+    threading.Thread(
+        target=_run_analysis_job,
+        args=(job_id, email_addr, images_bytes, description, cost, logo_bytes),
+        daemon=True,
+    ).start()
 
-    except Exception as e:
-        log.exception("Upload analysis error")
-        return jsonify({"error": str(e)}), 500
+    est = {1: 40, 2: 55, 3: 75, 4: 105}.get(num_images, 60)
+    return jsonify({
+        "status":            "processing",
+        "job_id":            job_id,
+        "estimated_seconds": est,
+        "num_images":        num_images,
+    })
+
+
+@app.route("/status/<job_id>", methods=["GET"])
+def job_status(job_id):
+    _cleanup_old_jobs()
+    with _jobs_lock:
+        job = dict(_jobs.get(job_id, {}))
+    if not job:
+        return jsonify({"status": "expired"}), 200
+    return jsonify(job), 200
+
 
 @app.route("/lemonsqueezy/webhook", methods=["POST"])
 def lemonsqueezy_webhook():
