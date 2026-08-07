@@ -216,10 +216,14 @@ Give a unified overall_score that reflects all images combined."""
     c_quality = _quals.get(num, 60)
 
     content = [{"type": "text", "text": prompt}]
-    for img_bytes in images_bytes_list:
-        compressed = compress_image(img_bytes, max_size=c_size, quality=c_quality)
-        b64 = base64.b64encode(compressed).decode()
-        content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
+# حساب إجمالي عدد الصور لتمريره لدالة الضغط
+total_images = len(images_bytes_list)
+
+for img_bytes in images_bytes_list:
+    # تمرير عدد الصور فقط ليتم تحديد الجودة والحجم تلقائياً من داخل الدالة
+    compressed = compress_image(img_bytes, num_images=total_images)
+    b64 = base64.b64encode(compressed).decode()
+    content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
 
     payload = {
         "model": "google/gemini-2.5-pro",
