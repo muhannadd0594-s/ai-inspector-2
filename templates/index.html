@@ -652,9 +652,17 @@ async function submitUpload() {
   const spinner = document.getElementById('btn-spinner');
   const btnText = document.getElementById('btn-text');
 
+  // دالة لإعادة الزر لحالته الطبيعية
+  const resetBtnUI = () => {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+    btnText.textContent = 'فحص الصورة الآن ←';
+  };
+
   const displayError = (msg) => {
     if(typeof showError === 'function') showError(msg);
     else { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+    resetBtnUI(); // إيقاف التحميل عند وجود خطأ
   };
 
   errEl.classList.add('hidden');
@@ -678,9 +686,9 @@ async function submitUpload() {
 
   btn.disabled = true;
   spinner.classList.remove('hidden');
-  btnText.textContent = 'جاري الفحص...';
+  btnText.textContent = 'جاري الرفع...';
 
-  // دالة مساعدة لتجهيز وإرسال الطلب (لتسهيل إعادة الإرسال لو لزم الأمر)
+  // دالة مساعدة لتجهيز وإرسال الطلب
   const sendRequest = async (secret) => {
     const form = new FormData();
     form.append('email', email);
@@ -700,34 +708,29 @@ async function submitUpload() {
   try {
     let resp = await sendRequest(userSecretCode);
     
-    // 2. إذا رد السيرفر بـ 401 (يتطلب رمز سري)، نطلبه من المستخدم ونعيد الإرسال
+    // 2. إذا رد السيرفر بـ 401 (يتطلب رمز سري)، نطلبه ونعيد الإرسال
     if (resp.status === 401) {
       const errorData = await resp.json();
       const entered = prompt(`🔒 ${errorData.message || 'هذا الحساب محمي.'}\nيرجى إدخال الرمز السري:`);
       if (entered && entered.trim() !== '') {
         userSecretCode = entered.trim();
-        resp = await sendRequest(userSecretCode); // إعادة إرسال الطلب بالرمز الجديد
+        resp = await sendRequest(userSecretCode); 
       } else {
         displayError('الرمز السري مطلوب للمتابعة.');
         return;
       }
     }
     
-    // معالجة باقي الأخطاء بعد الطلب النهائي
-    if (resp.status === 404) {
-      displayError('حدث خطأ 404: الخادم أو الرابط غير موجود.');
-      return;
-    }
-    
+    // معالجة باقي الأخطاء
+    if (resp.status === 404) { displayError('حدث خطأ 404: الخادم أو الرابط غير موجود.'); return; }
     if (resp.status === 403) {
       const errorData = await resp.json();
       displayError(errorData.message || 'الرمز السري غير صحيح أو أنك لا تملك صلاحية الوصول.');
       return;
     }
-    
     if (resp.status === 402) {
       displayError('نفد رصيدك. اشترِ باقة للاستمرار.');
-      document.getElementById('pricing').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
     
@@ -737,32 +740,72 @@ async function submitUpload() {
       return; 
     }
 
-    /* حفظ البيانات وعرض التقرير */
-    window._lastReportHtml   = data.report;
-    window._lastDesc         = desc || 'تقرير فحص المنتج';
-    window._lastImagesB64    = data.images_b64 || [];
-    window._lastCustomLogo   = data.custom_logo_b64 || '';
-
-    resEl.innerHTML = data.report;
-    resEl.classList.remove('hidden');
-    pdfArea.classList.remove('hidden');
-    resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    const planLabel = data.plan === 'exempt' ? 'مفتوح / استثناء' : (data.plan || '');
-    document.getElementById('credits-info').textContent = data.is_exempt
-      ? `حساب استثنائي — فحوصات غير محدودة (باقة: ${planLabel}) 🎁`
-      : `الرصيد المتبقي: ${data.credits} فحص (خُصم ${data.cost} فحص)`;
+    // 3. التعديل الجديد (Polling)
+    if (data.job_id) {
+        btnText.textContent = 'جاري التحليل...';
+        pollStatus(data.job_id); // نبدأ بفحص الحالة
+    } else if (data.report) {
+        // كاحتياط إذا أرجع السيرفر التقرير مباشرة
+        handleSuccess(data);
+    } else {
+        displayError('استجابة غير متوقعة من الخادم.');
+    }
 
   } catch (e) {
     console.error('Upload Error:', e);
     displayError('خطأ في الاتصال، تحقق من الشبكة وحاول مجدداً');
-  } finally {
-    btn.disabled = false;
-    spinner.classList.add('hidden');
-    btnText.textContent = 'فحص الصورة الآن ←';
+  }
+
+  // --- دوال مساعدة للتعامل مع الـ Polling والنجاح ---
+
+  // دالة الاستعلام الدوري (Polling)
+  async function pollStatus(jobId) {
+    try {
+        // إذا كان مسار السيرفر عندك يستخدم بارامتر، استبدل السطر التالي بـ: fetch(`/status?job_id=${jobId}`)
+        const res = await fetch(`/status/${jobId}`); 
+        const statusData = await res.json();
+
+        if (statusData.status === 'completed' || statusData.status === 'done') {
+            handleSuccess(statusData);
+        } else if (statusData.status === 'failed' || statusData.status === 'error') {
+            displayError(statusData.error || 'فشل في تحليل الملف');
+        } else {
+            // الحالة لا زالت "processing"
+            btnText.textContent = 'جاري المعالجة (قد يستغرق بعض الوقت)...';
+            setTimeout(() => pollStatus(jobId), 1500); // يفحص مرة أخرى بعد ثانية ونصف
+        }
+    } catch (err) {
+        console.error('Polling Error:', err);
+        displayError('فقد الاتصال أثناء انتظار النتيجة.');
+    }
+  }
+
+  // دالة معالجة النجاح وعرض التقرير
+  function handleSuccess(resultData) {
+    /* حفظ البيانات وعرض التقرير */
+    window._lastReportHtml   = resultData.report;
+    window._lastDesc         = desc || 'تقرير فحص المنتج';
+    window._lastImagesB64    = resultData.images_b64 || [];
+    window._lastCustomLogo   = resultData.custom_logo_b64 || '';
+
+    resEl.innerHTML = resultData.report;
+    resEl.classList.remove('hidden');
+    pdfArea.classList.remove('hidden');
+    resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const planLabel = resultData.plan === 'exempt' ? 'مفتوح / استثناء' : (resultData.plan || '');
+    const creditsInfo = document.getElementById('credits-info');
+    if (creditsInfo) {
+      creditsInfo.textContent = resultData.is_exempt
+        ? `حساب استثنائي — فحوصات غير محدودة (باقة: ${planLabel}) 🎁`
+        : `الرصيد المتبقي: ${resultData.credits} فحص (خُصم ${resultData.cost} فحص)`;
+    }
+    
+    // إنهاء حالة التحميل للزر
+    resetBtnUI();
   }
 }
-
+  
 /* ════ PDF Generator ════ */
 function downloadPDF() {
   if (!window._lastReportHtml) { alert('لا يوجد تقرير لتحميله بعد.'); return; }
