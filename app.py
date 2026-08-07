@@ -114,14 +114,26 @@ def add_credits(email_addr, plan, amount):
     db.commit()
 
 # ─── Image & AI ─────────────────────────────────────────────────────────────
-def compress_image(image_bytes, max_size=(800, 800), quality=85):
+# ─── Image & AI ─────────────────────────────────────────────────────────────
+def compress_image(image_bytes, num_images=1):
     try:
+        # تحديد الأبعاد والجودة بناءً على عدد الصور لكشف البقع والعيوب الدقيقة
+        if num_images <= 2:
+            max_size = (1280, 1280)  # دقة عالية جداً للصور القليلة تكشف أصفر البقع
+            quality = 88
+        else:
+            max_size = (1024, 1024)  # دقة ممتازة لـ 3 صور أو أكثر تمنع الـ Timeout
+            quality = 82
+
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
+        
+        # تصغير الصورة مع الحفاظ على النسب وأعلى حدة تفاصيل
         img.thumbnail(max_size, Image.Resampling.LANCZOS)
+        
         out = io.BytesIO()
-        img.save(out, format="JPEG", quality=quality)
+        img.save(out, format="JPEG", quality=quality, optimize=True)
         return out.getvalue()
     except Exception as e:
         log.error("compress_image error: %s", e)
@@ -130,14 +142,24 @@ def compress_image(image_bytes, max_size=(800, 800), quality=85):
 
 def get_dynamic_prompt(subject, caption):
     combined = f"{subject} {caption}".lower()
+    
     base = """أنت خبير محترف ومعتمد في فحص جودة المنتجات وتوثيق حالة السلع بدقة فائقة.
-قم بتحليل صورة المنتج والوصف بعمق شديد، وقدم تقرير فحص احترافي شامل ومفصل.
-يجب أن ترجع إجابتك ككائن JSON خام فقط (بدون markdown أو ```json):
+مهمتك هي تحليل صورة المنتج والوصف المرفق بعمق شديد، وتقديم تقرير فحص احترافي شامل ومفصل.
+
+التعليمات الصارمة (CRITICAL INSTRUCTIONS):
+1. الإخراج يجب أن يكون كائن JSON صالحاً (Valid JSON) فقط، بدون أي نصوص إضافية قبله أو بعده، وبدون علامات تنسيق مثل ` ```json `.
+2. جميع النصوص والقيم داخل JSON يجب أن تكون باللغة العربية الفصحى الاحترافية والسليمة إملائياً.
+3. التقييمات الرقمية يجب أن تكون واقعية ومبنية على تحليل بصري دقيق (بين 30 إلى 95).
+4. اجعل قيمة "image_quality" تساوي "good" دائماً، إلا إذا كانت الصورة مشوهة تماماً أو يستحيل رؤية تفاصيلها.
+5. يجب أن تحتوي قائمة "metrics" على 4 معايير على الأقل مع تقييم رقمي.
+6. يجب أن تحتوي قائمة "observations" على 3 ملاحظات تفصيلية على الأقل تعكس حالة المنتج الفعلية.
+
+هيكل الإخراج المطلوب (JSON Schema):
 {
   "image_quality": "good|poor|unusable",
-  "quality_note": "شرح تفصيلي لحالة الصورة إن كانت بحاجة لتحسين، وإلا تركها فارغة",
+  "quality_note": "شرح تفصيلي لحالة الصورة إن كانت بحاجة لتحسين، وإلا اتركها فارغة",
   "overall_score": 85,
-  "verdict_title": "عنوان احترافي يصف الحالة بدقة",
+  "verdict_title": "عنوان احترافي يصف الحالة بدقة (مثال: حالة ممتازة مع آثار استخدام طفيفة)",
   "verdict_status": "success|warning|danger",
   "metrics": [
     {"name": "النظافة العامة وخلو السطح من الخدوش والعيوب", "score": 85},
@@ -146,30 +168,32 @@ def get_dynamic_prompt(subject, caption):
     {"name": "مستوى الاستخدام والتآكل العام", "score": 80}
   ],
   "observations": [
-    {"type": "damage|discrepancy|note", "title": "عنوان الملاحظة التفصيلي", "description": "شرح وافٍ ومفصل للملاحظة مع تحليل تأثيرها على قيمة المنتج."}
+    {
+      "type": "damage|discrepancy|note",
+      "title": "عنوان الملاحظة (مثال: خدش دقيق في الزاوية العلوية)",
+      "description": "شرح وافٍ ومفصل للملاحظة مع تحليل تأثيرها على قيمة المنتج وأدائه."
+    }
   ],
-  "summary_for_user": "توصية نهائية احترافية ومفصلة توجه المشتري حول جدوى الشراء والمخاطر المحتملة."
-}
-CRITICAL:
-1. جميع النصوص داخل JSON تكون باللغة العربية الفصحى الاحترافية حصراً.
-2. التقييمات تكون واقعية ومبنية على تحليل بصري (بين 30% إلى 95%).
-3. ضع image_quality="good" دائماً إلا إذا كانت الصورة سوداء أو ضبابية كلياً بحيث يستحيل رؤية أي شيء.
-4. يجب أن تحتوي metrics على 4 معايير على الأقل مع تقييم رقمي دقيق.
-5. يجب أن تحتوي observations على 3 ملاحظات على الأقل."""
+  "summary_for_user": "توصية نهائية احترافية ومفصلة توجه المشتري حول جدوى الشراء والمخاطر المحتملة بناءً على الفحص."
+}"""
 
-    if any(w in combined for w in ["جوال","ايفون","لابتوب","شاشة","ايباد","phone","electronics"]):
-        cat = "\n\nFocus (Electronics): screen scratches, damaged corners, camera module, back glass integrity, hardware wear."
-    elif any(w in combined for w in ["ساعة","ماركة","شنطة","نظارة","محفظة","watch","bag","luxury"]):
-        cat = "\n\nFocus (Luxury): logo accuracy, stitching precision, engravings, leather/metal wear, authenticity."
-    elif any(w in combined for w in ["سيارة","سيارات","قطع","صدام","جنط","car","auto"]):
-        cat = "\n\nFocus (Auto): rust, cracks, paint resprays, color mismatches, dents."
-    elif any(w in combined for w in ["ملابس","ثوب","قميص","فستان","حذاء","clothes","fashion"]):
-        cat = "\n\nFocus (Fashion): fabric condition, stains, loose threads, tears, finishing quality."
+    # فئات الفحص (مترجمة وموسعة)
+    if any(w in combined for w in ["جوال", "ايفون", "لابتوب", "شاشة", "ايباد", "phone", "electronics", "laptop", "mobile", "apple", "samsung"]):
+        cat = "\n\nالتركيز الخاص (إلكترونيات): ركز بشدة على خدوش الشاشة، زوايا الجهاز، سلامة عدسات الكاميرا، الزجاج الخلفي، وأي علامات تآكل في المنافذ أو الهيكل."
+    elif any(w in combined for w in ["ساعة", "ماركة", "شنطة", "نظارة", "محفظة", "watch", "bag", "luxury", "rolex", "gucci"]):
+        cat = "\n\nالتركيز الخاص (سلع فاخرة): دقق في دقة الشعارات، جودة الخياطة، النقوش، تآكل الجلد أو المعدن، وأي علامات تدل على الأصالة أو التزييف."
+    elif any(w in combined for w in ["سيارة", "سيارات", "قطع", "صدام", "جنط", "car", "auto", "engine", "tire"]):
+        cat = "\n\nالتركيز الخاص (السيارات وقطع الغيار): ابحث عن الصدأ، الشقوق، إعادة الطلاء، عدم تطابق الألوان، والانبعاجات أو الخدوش العميقة."
+    elif any(w in combined for w in ["ملابس", "ثوب", "قميص", "فستان", "حذاء", "clothes", "fashion", "shoes", "sneakers"]):
+        cat = "\n\nالتركيز الخاص (الأزياء والملابس): افحص حالة القماش، وجود بقع، خيوط مفكوكة، تمزق، جودة الخياطة، والتشطيب العام."
     else:
-        cat = "\n\nFocus (General): comprehensive quality inspection."
+        cat = "\n\nالتركيز الخاص (عام): قم بإجراء فحص شامل لجودة المنتج وحالته العامة وأي عيوب ظاهرة."
 
-    user = f'\n\nSeller caption:\n"{caption}"' if caption else ""
-    return base + cat + user
+    user_input = f'\n\nمعلومات المنتج المراد فحصه:\n- نوع المنتج: "{subject}"'
+    if caption:
+        user_input += f'\n- وصف البائع: "{caption}"'
+        
+    return base + cat + user_input
 
 def analyze_image(images_bytes_list, caption, subject):
     num    = len(images_bytes_list)
