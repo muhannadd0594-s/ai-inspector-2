@@ -186,14 +186,14 @@ In observations, specify which image revealed which detail using:
 Give a unified overall_score that reflects all images combined."""
 
     # ضغط أقوى لـ 3+ صور لتجنب timeout
-c_size    = (640, 640) if num >= 3 else (800, 800)
-c_quality = 72         if num >= 3 else 85
+    c_size    = (640, 640) if num >= 3 else (800, 800)
+    c_quality = 72         if num >= 3 else 85
 
+    content = [{"type": "text", "text": prompt}]
     for img_bytes in images_bytes_list:
         compressed = compress_image(img_bytes, max_size=c_size, quality=c_quality)
         b64 = base64.b64encode(compressed).decode()
         content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
-
 
     payload = {
         "model": "google/gemini-2.5-pro",
@@ -239,6 +239,7 @@ c_quality = 72         if num >= 3 else 85
             "verdict_status": "warning", "metrics": [], "observations": [],
             "summary_for_user": "حدث خطأ أثناء المعالجة. يُرجى إعادة المحاولة.",
         }
+
 
 # ─── Report HTML ─────────────────────────────────────────────────────────────
 def format_report_html(result, logo_b64=None):
