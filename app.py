@@ -189,11 +189,11 @@ Give a unified overall_score that reflects all images combined."""
 c_size    = (640, 640) if num >= 3 else (800, 800)
 c_quality = 72         if num >= 3 else 85
 
-content = [{"type": "text", "text": prompt}]
-for img_bytes in images_bytes_list:
-    compressed = compress_image(img_bytes, max_size=c_size, quality=c_quality)
+    for img_bytes in images_bytes_list:
+        compressed = compress_image(img_bytes, max_size=c_size, quality=c_quality)
         b64 = base64.b64encode(compressed).decode()
         content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
+
 
     payload = {
         "model": "google/gemini-2.5-pro",
