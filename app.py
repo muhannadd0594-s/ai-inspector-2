@@ -186,8 +186,10 @@ In observations, specify which image revealed which detail using:
 Give a unified overall_score that reflects all images combined."""
 
     # ضغط أقوى لـ 3+ صور لتجنب timeout
-    c_size    = (640, 640) if num >= 3 else (800, 800)
-    c_quality = 72         if num >= 3 else 85
+   _sizes    = {1:(800,800), 2:(720,720), 3:(600,600), 4:(480,480)}
+_quals    = {1:85,        2:80,        3:72,        4:60}
+c_size    = _sizes.get(num, (480,480))
+c_quality = _quals.get(num, 60)
 
     content = [{"type": "text", "text": prompt}]
     for img_bytes in images_bytes_list:
