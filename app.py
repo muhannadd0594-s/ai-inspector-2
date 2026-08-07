@@ -114,24 +114,12 @@ def add_credits(email_addr, plan, amount):
     db.commit()
 
 # ─── Image & AI ─────────────────────────────────────────────────────────────
-# ─── Image & AI ─────────────────────────────────────────────────────────────
-def compress_image(image_bytes, num_images=1):
+def compress_image(image_bytes, max_size=(1280, 1280), quality=88):
     try:
-        # تحديد الأبعاد والجودة بناءً على عدد الصور لكشف البقع والعيوب الدقيقة
-        if num_images <= 2:
-            max_size = (1280, 1280)  # دقة عالية جداً للصور القليلة تكشف أصفر البقع
-            quality = 88
-        else:
-            max_size = (1024, 1024)  # دقة ممتازة لـ 3 صور أو أكثر تمنع الـ Timeout
-            quality = 82
-
         img = Image.open(io.BytesIO(image_bytes))
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
-        
-        # تصغير الصورة مع الحفاظ على النسب وأعلى حدة تفاصيل
         img.thumbnail(max_size, Image.Resampling.LANCZOS)
-        
         out = io.BytesIO()
         img.save(out, format="JPEG", quality=quality, optimize=True)
         return out.getvalue()
@@ -177,7 +165,6 @@ def get_dynamic_prompt(subject, caption):
   "summary_for_user": "توصية نهائية احترافية ومفصلة توجه المشتري حول جدوى الشراء والمخاطر المحتملة بناءً على الفحص."
 }"""
 
-    # فئات الفحص (مترجمة وموسعة)
     if any(w in combined for w in ["جوال", "ايفون", "لابتوب", "شاشة", "ايباد", "phone", "electronics", "laptop", "mobile", "apple", "samsung"]):
         cat = "\n\nالتركيز الخاص (إلكترونيات): ركز بشدة على خدوش الشاشة، زوايا الجهاز، سلامة عدسات الكاميرا، الزجاج الخلفي، وأي علامات تآكل في المنافذ أو الهيكل."
     elif any(w in combined for w in ["ساعة", "ماركة", "شنطة", "نظارة", "محفظة", "watch", "bag", "luxury", "rolex", "gucci"]):
@@ -195,6 +182,7 @@ def get_dynamic_prompt(subject, caption):
         
     return base + cat + user_input
 
+
 def analyze_image(images_bytes_list, caption, subject):
     num    = len(images_bytes_list)
     prompt = get_dynamic_prompt(subject, caption)
@@ -209,23 +197,24 @@ In observations, specify which image revealed which detail using:
 "الصورة الأولى:", "الصورة الثانية:", "الصورة الثالثة:", "الصورة الرابعة:"
 Give a unified overall_score that reflects all images combined."""
 
-    sizes = {1: (800,800), 2: (720,720), 3: (600,600), 4: (480,480)}
-    quals = {1: 85,        2: 80,        3: 72,        4: 60}
+    # جودة مرتفعة موازنة لجميع الصور — Gemini 2.5 Pro يستوعبها
+    sizes = {1: (1280, 1280), 2: (1100, 1100), 3: (960, 960), 4: (900, 900)}
+    quals = {1: 88,           2: 85,           3: 82,         4: 80        }
 
     content = [{"type": "text", "text": prompt}]
     for img_bytes in images_bytes_list:
         compressed = compress_image(
             img_bytes,
-            max_size=sizes.get(num, (480,480)),
-            quality=quals.get(num, 60),
+            max_size=sizes.get(num, (900, 900)),
+            quality =quals.get(num, 80),
         )
         b64 = base64.b64encode(compressed).decode()
         content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}})
 
     payload = {
-        "model": "google/gemini-2.5-pro",
+        "model":       "google/gemini-2.5-pro",
         "temperature": 0.2,
-        "messages": [{"role": "user", "content": content}],
+        "messages":    [{"role": "user", "content": content}],
     }
 
     try:
