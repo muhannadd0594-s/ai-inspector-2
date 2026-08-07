@@ -6,6 +6,7 @@ import sqlite3
 import hashlib
 import hmac
 import io
+import math
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template, g
 import requests
@@ -358,23 +359,33 @@ def direct_upload():
             log.warning("Bad secret code for %s", email_addr)
             return jsonify({"error": "invalid_secret", "message": "الرمز السري غير صحيح"}), 403
 
-    valid_files = [f for f in image_files if f.filename != ""]
+        valid_files = [f for f in image_files if f.filename != ""]
     num_images  = len(valid_files)
-    cost        = max(1, num_images // 2)
+
+    # التحقق من حد الصور حسب الباقة
+    user_check = get_or_create_user(email_addr)
+    photo_limit_map = {"free":1, "basic":1, "pro":2, "vip":4, "exempt":4}
+    photo_limit = photo_limit_map.get(user_check["plan"], 1)
+    if num_images > photo_limit:
+        return jsonify({"error": f"باقتك تسمح بـ {photo_limit} صور كحد أقصى"}), 400
+
+    cost = max(1, math.ceil(num_images / 2))
+
 
     user = get_or_create_user(email_addr)
     if not is_exempt(email_addr) and user["credits"] < cost:
         return jsonify({"error": "نفد رصيدك", "credits": user["credits"]}), 402
 
-    if not is_exempt(email_addr):
-        db = get_db()
-        db.execute("UPDATE users SET credits=credits-?, updated_at=? WHERE email=?",
-                   (cost, datetime.now(timezone.utc).isoformat(), email_addr))
-        db.commit()
-
-    try:
+        try:
         images_bytes_list = [f.read() for f in valid_files]
         result = analyze_image(images_bytes_list, description, description)
+
+        # الخصم فقط بعد نجاح التحليل
+        if not is_exempt(email_addr):
+            db = get_db()
+            db.execute("UPDATE users SET credits=credits-?, updated_at=? WHERE email=?",
+                       (cost, datetime.now(timezone.utc).isoformat(), email_addr))
+            db.commit()
 
         custom_logo_b64 = None
         logo_file = request.files.get("custom_logo")
