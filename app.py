@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import io
 import math
+import shutil
 import threading
 import uuid
 import time
@@ -19,10 +20,19 @@ from PIL import Image
 
 load_dotenv()
 
-# تحديد المسارات المطلقة لضمان العثور على القوالب والملفات على Vercel
+# تحديد المسارات بطريقة مستقرة على Vercel/Local
 base_dir = os.path.dirname(os.path.abspath(__file__))
 template_dir = os.path.join(base_dir, 'templates')
 static_dir = os.path.join(base_dir, 'static')
+
+if not os.path.isdir(static_dir):
+    os.makedirs(static_dir, exist_ok=True)
+
+for asset_name in ("logo.png", "og-image.png", "image.png"):
+    src_path = os.path.join(template_dir, asset_name)
+    dst_path = os.path.join(static_dir, asset_name)
+    if os.path.exists(src_path) and not os.path.exists(dst_path):
+        shutil.copy2(src_path, dst_path)
 
 app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32 MB
@@ -158,6 +168,11 @@ except Exception as _e:
 @app.route('/')
 def home():
     return render_template('index.html')
+
+@app.route('/favicon.ico')
+@app.route('/favicon.png')
+def favicon_redirect():
+    return app.send_static_file('logo.png')
 
 # ─── User Helpers ─────────────────────────────────────────────────────────────
 def is_exempt(email_addr):
