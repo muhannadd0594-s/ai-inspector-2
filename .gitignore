@@ -1,2 +1,26 @@
+# Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# البيئة المحلية
+.env
+.env.local
+
+# قاعدة البيانات المحلية
+*.db
+*.sqlite3
+/tmp/
+
+# مجلدات بيئة Python
+venv/
+.venv/
+env/
+
+# Vercel
+.vercel/
+
+# نظام التشغيل
+.DS_Store
+Thumbs.db
