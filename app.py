@@ -6,7 +6,6 @@ import hashlib
 import hmac
 import io
 import math
-import shutil
 import threading
 import uuid
 import time
@@ -20,22 +19,16 @@ from PIL import Image
 
 load_dotenv()
 
-# تحديد المسارات بطريقة مستقرة على Vercel/Local
-base_dir = os.path.dirname(os.path.abspath(__file__))
-template_dir = os.path.join(base_dir, 'templates')
-static_dir = os.path.join(base_dir, 'static')
+# ─── مسارات الملفات ───────────────────────────────────────────────────────────
+_ROOT = os.path.dirname(os.path.abspath(__file__))
 
-if not os.path.isdir(static_dir):
-    os.makedirs(static_dir, exist_ok=True)
-
-for asset_name in ("logo.png", "og-image.png", "image.png"):
-    src_path = os.path.join(template_dir, asset_name)
-    dst_path = os.path.join(static_dir, asset_name)
-    if os.path.exists(src_path) and not os.path.exists(dst_path):
-        shutil.copy2(src_path, dst_path)
-
-app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
-app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32 MB
+app = Flask(
+    __name__,
+    template_folder=os.path.join(_ROOT, "templates"),
+    static_folder=os.path.join(_ROOT, "static"),
+    static_url_path="/static",
+)
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("ai-inspector")
@@ -199,27 +192,17 @@ except Exception as _e:
 # ─── Routes (home) ───────────────────────────────────────────────────────────
 @app.route('/')
 def home():
-    index_path = os.path.join(template_dir, 'index.html')
-    if os.path.exists(index_path):
-        return render_template('index.html')
-    return Response(fallback_homepage_html(), mimetype='text/html; charset=utf-8')
+    return render_template('index.html')
 
 @app.route('/favicon.ico')
 @app.route('/favicon.png')
 def favicon_redirect():
-    logo_path = os.path.join(static_dir, 'logo.png')
+    logo_path = os.path.join(_ROOT, 'static', 'logo.png')
     if os.path.exists(logo_path):
         return app.send_static_file('logo.png')
     return send_file(io.BytesIO(FALLBACK_LOGO_PNG), mimetype='image/png', as_attachment=False)
 
-@app.route('/static/<path:filename>')
-def serve_static_file(filename):
-    safe_path = os.path.join(static_dir, filename)
-    if os.path.exists(safe_path):
-        return send_from_directory(static_dir, filename)
-    if filename in {'logo.png', 'og-image.png', 'image.png'}:
-        return send_file(io.BytesIO(FALLBACK_LOGO_PNG), mimetype='image/png', as_attachment=False)
-    return jsonify({"error": "not found"}), 404
+
 
 # ─── User Helpers ─────────────────────────────────────────────────────────────
 def is_exempt(email_addr):
