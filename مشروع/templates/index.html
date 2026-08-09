@@ -1,191 +1,920 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Inspector - فحص المنتجات والسيارات بالذكاء الاصطناعي عبر البريد</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts: Tajawal -->
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Tajawal', sans-serif;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/static/logo.png">
+  <link rel="apple-touch-icon" href="/static/logo.png">
+  <title>AI Inspector | فحص المنتجات المستعملة بالذكاء الاصطناعي</title>
+  <meta name="description" content="افحص أي منتج مستعمل قبل الشراء بدقة الخبراء — جوالات، سيارات، ساعات، ملابس.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://ai-inspector-tau.vercel.app/">
+  
+  <!-- Open Graph / Facebook / WhatsApp -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://ai-inspector-tau.vercel.app/">
+  <meta property="og:title" content="AI Inspector | فحص المنتجات المستعملة بالذكاء الاصطناعي">
+  <meta property="og:description" content="افحص أي منتج مستعمل قبل الشراء. تقرير احترافي فوري باللغة العربية.">
+  <meta property="og:locale" content="ar_SA">
+  
+  <!-- رابط الصورة المباشر من Vercel CDN -->
+  <meta property="og:image" content="https://ai-inspector-tau.vercel.app/static/og-image.png">
+  <meta property="og:image:secure_url" content="https://ai-inspector-tau.vercel.app/static/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AI Inspector | فحص المنتجات المستعملة بالذكاء الاصطناعي">
+  <meta name="twitter:description" content="افحص أي منتج مستعمل قبل الشراء. تقرير احترافي فوري باللغة العربية.">
+  <meta name="twitter:image" content="https://ai-inspector-tau.vercel.app/static/og-image.png">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Tajawal', sans-serif; }
+    .ls-checkout { cursor: pointer; }
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; z-index: 999;
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    details summary::-webkit-details-marker { display: none; }
+
+    /* Image preview thumbnails */
+    .preview-thumb {
+      position: relative; display: inline-block;
+    }
+    .preview-thumb img {
+      width: 72px; height: 72px; object-fit: cover;
+      border-radius: 8px; border: 2px solid #334155;
+      display: block;
+    }
+    .preview-thumb .remove-btn {
+      position: absolute; top: -6px; left: -6px;
+      background: #ef4444; color: #fff; border: none;
+      border-radius: 50%; width: 18px; height: 18px;
+      font-size: 10px; cursor: pointer; line-height: 18px;
+      text-align: center; font-weight: bold;
+    }
+  </style>
 </head>
-<body class="bg-slate-950 text-slate-100 antialiased selection:bg-emerald-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 antialiased">
 
-    <!-- Navbar -->
-    <nav class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md fixed top-0 w-full z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center font-bold text-slate-950 text-xl shadow-lg shadow-emerald-500/20">
-                    AI
-                </div>
-                <span class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-                    AI Inspector
-                </span>
-            </div>
-            <div class="flex items-center gap-4">
-                <a href="#pricing" class="text-sm font-medium text-slate-300 hover:text-white transition-colors">الباقات والأسعار</a>
-                <a href="mailto:akashiiso04@gmail.com" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition-all shadow-md shadow-emerald-500/10">
-                    تجربة مجانية
-                </a>
-            </div>
-        </div>
-    </nav>
+<!-- ════════════════════════════════════════════ MODALS -->
 
-    <!-- Hero Section -->
-    <section class="pt-32 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center relative overflow-hidden">
-        <div class="absolute inset-0 -z-10 flex items-center justify-center">
-            <div class="w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-3xl"></div>
-        </div>
-        
-        <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-6">
-            ✨ خدمة فحص فورية عبر البريد الإلكتروني
-        </span>
-        
-        <h1 class="text-4xl sm:text-6xl font-extrabold text-white leading-tight max-w-4xl mx-auto mb-6">
-            افحص أجزاء السيارات والمنتجات بالذكاء الاصطناعي <span class="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">خلال ثوانٍ</span>
-        </h1>
-        
-        <p class="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            أرسل صور القطعة أو السيارة أو المنتج إلى بريدنا الإلكتروني، وسيقوم نظام الذكاء الاصطناعي بتحليل الحالة وكشف العيوب وإرسال تقرير مفصل إلى بريدك مباشرة.
-        </p>
+<!-- Privacy Modal -->
+<div id="modal-privacy" class="modal-backdrop" onclick="closeModal('modal-privacy')">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto p-8 text-right" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-bold text-white">سياسة الخصوصية</h2>
+      <button onclick="closeModal('modal-privacy')" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+    </div>
+    <div class="text-slate-300 text-sm leading-relaxed space-y-5">
+      <p><strong class="text-white">آخر تحديث:</strong> يناير 2026</p>
+      <h3 class="text-emerald-400 font-bold text-base">1. البيانات التي نجمعها</h3>
+      <ul class="list-disc list-inside space-y-1 pr-4">
+        <li>عنوان البريد الإلكتروني — لتتبع رصيد الفحوصات.</li>
+        <li>صورة المنتج المرفوعة — لإجراء التحليل الآلي فقط.</li>
+        <li>وصف المنتج (اختياري) — لتعزيز دقة التحليل.</li>
+      </ul>
+      <h3 class="text-emerald-400 font-bold text-base">2. كيف نستخدم بياناتك</h3>
+      <p>تُستخدم صورة المنتج حصرياً لتوليد تقرير الفحص الآلي. <strong class="text-white">يتم حذف الصورة تلقائياً فور اكتمال المعالجة.</strong></p>
+      <h3 class="text-emerald-400 font-bold text-base">3. الدفع الإلكتروني</h3>
+      <p>تتم عمليات الدفع عبر منصة <strong class="text-white">Lemon Squeezy</strong> المشفرة. نحن لا نطّلع على أي بيانات بطاقة ائتمانية.</p>
+      <h3 class="text-emerald-400 font-bold text-base">4. حقوقك</h3>
+      <p>تواصل معنا لحذف بياناتك: <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 underline">akashiiso04@gmail.com</a></p>
+    </div>
+  </div>
+</div>
 
-        <div class="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto">
-            <a href="mailto:akashiiso04@gmail.com" class="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-8 py-4 rounded-xl text-lg transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2">
-                <span>أرسل صورك للفحص الآن</span>
-                <svg class="w-5 h-5 transform rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-            </a>
-        </div>
-        
-        <p class="text-xs text-slate-500 mt-4">📧 البريد المخصص للفحص: <code class="text-emerald-400 bg-slate-900 px-2 py-1 rounded border border-slate-800">akashiiso04@gmail.com</code></p>
-    </section>
+<!-- Terms Modal -->
+<div id="modal-terms" class="modal-backdrop" onclick="closeModal('modal-terms')">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto p-8 text-right" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-bold text-white">الشروط والأحكام وسياسة الاسترجاع</h2>
+      <button onclick="closeModal('modal-terms')" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+    </div>
+    <div class="text-slate-300 text-sm leading-relaxed space-y-5">
+      <p><strong class="text-white">آخر تحديث:</strong> يناير 2026</p>
+      <h3 class="text-emerald-400 font-bold text-base">1. طبيعة الخدمة</h3>
+      <p>AI Inspector أداة تحليل بصري آلية. <strong class="text-white">التقارير استرشادية وغير ملزمة قانونياً.</strong></p>
+      <h3 class="text-emerald-400 font-bold text-base">2. سياسة الاسترجاع</h3>
+      <p>لا يُسمح بالاسترداد بعد استهلاك الفحوصات. في حالات الأعطال التقنية يتم منح رصيد تعويضي.</p>
+      <p>للمطالبة: <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 underline">akashiiso04@gmail.com</a> خلال 7 أيام.</p>
+      <h3 class="text-emerald-400 font-bold text-base">3. باقة VIP والتجديد</h3>
+      <p>باقة VIP تتجدد شهرياً آلياً. عند إلغاء الاشتراك يُلغى الرصيد المترحل فوراً.</p>
+    </div>
+  </div>
+</div>
 
-    <!-- How It Works -->
-    <section class="py-20 bg-slate-900/50 border-y border-slate-800">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="text-center mb-16">
-                <h2 class="text-3xl font-bold text-white mb-4">كيف تعمل الخدمة؟</h2>
-                <p class="text-slate-400">3 خطوات بسيطة للحصول على تقرير فحص دقيق وشامل</p>
-            </div>
+<!-- Contact Modal -->
+<div id="modal-contact" class="modal-backdrop" onclick="closeModal('modal-contact')">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full mx-4 p-8 text-right" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-bold text-white">التواصل والدعم الفني</h2>
+      <button onclick="closeModal('modal-contact')" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+    </div>
+    <p class="text-slate-400 text-sm mb-8">اضغط على الزر أدناه ليتم تحويلك لتطبيق البريد وسنرد خلال 24 ساعة.</p>
+    <a href="mailto:akashiiso04@gmail.com?subject=دعم%20فني%20-%20AI%20Inspector"
+       class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-4 rounded-xl text-sm transition-all flex justify-center items-center gap-2">
+      <span class="text-xl">✉️</span> إرسال رسالة عبر البريد الإلكتروني
+    </a>
+    <p class="text-slate-500 text-xs text-center mt-4">akashiiso04@gmail.com</p>
+  </div>
+</div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-                <!-- Step 1 -->
-                <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 relative">
-                    <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">1</div>
-                    <h3 class="text-xl font-bold text-white mb-3">أرسل الصور إيميل</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        التقط صوراً للقطعة أو المنتج أو الجزء المراد فحصه، وأرسلها كمرفقات إلى <span class="text-emerald-400">akashiiso04@gmail.com</span>.
-                    </p>
-                </div>
+<!-- ════════════════════════════════════════════ NAVBAR -->
+<nav class="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md fixed top-0 w-full z-50">
+  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <img src="/static/logo.png" alt="AI Inspector" class="w-10 h-10 rounded-xl object-cover shadow-lg shadow-emerald-500/20">
+      <span class="font-extrabold text-xl bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">AI Inspector</span>
+    </div>
+    <div class="hidden sm:flex items-center gap-6 text-sm text-slate-400">
+      <a href="#pricing" class="hover:text-white transition-colors">الأسعار</a>
+      <a href="#faq" class="hover:text-white transition-colors">الأسئلة الشائعة</a>
+      <button onclick="openModal('modal-contact')" class="hover:text-white transition-colors">الدعم الفني</button>
+    </div>
+    <a href="#pricing" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition-all">الباقات والأسعار</a>
+  </div>
+</nav>
 
-                <!-- Step 2 -->
-                <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 relative">
-                    <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">2</div>
-                    <h3 class="text-xl font-bold text-white mb-3">تحليل الذكاء الاصطناعي</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        يقوم نموذج الذكاء الاصطناعي المتقدم بفحص التفاصيل الدقيقة، كشف التلفيات، وتقييم جودة المنتج وحالته التشغيلية.
-                    </p>
-                </div>
+<!-- ════════════════════════════════════════════ HERO + UPLOAD FORM -->
+<section class="pt-32 pb-16 px-4 max-w-7xl mx-auto text-center relative overflow-hidden">
+  <div class="absolute inset-0 -z-10 flex items-center justify-center">
+    <div class="w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-3xl"></div>
+  </div>
+  <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-6">
+    🚀 مدعوم بأحدث نماذج الذكاء الاصطناعي لفحص الصور
+  </span>
+  <h1 class="text-4xl sm:text-6xl font-extrabold text-white leading-tight max-w-4xl mx-auto mb-6">
+    اكتشف أدق العيوب في المنتجات
+    <span class="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">بدقة الخبراء وفي ثوانٍ</span>
+  </h1>
+  <p class="text-lg text-slate-400 max-w-2xl mx-auto mb-10">
+    ارفع صور المنتج مع وصف قصير، وسيرسل نظامنا تقريراً تشخيصياً احترافياً فورياً.
+  </p>
 
-                <!-- Step 3 -->
-                <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800 relative">
-                    <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">3</div>
-                    <h3 class="text-xl font-bold text-white mb-3">استلم التقرير الفوري</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        يصلك رد آلي على نفس الإيميل خلال 15 ثانية يحتوي على تقرير تقييم شامل وملاحظات السلامة والعيوب.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
+  <!-- Upload Form -->
+  <div class="max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 text-right shadow-xl">
+    <h3 class="text-lg font-bold text-white mb-4">🔍 افحص منتجك الآن</h3>
 
-    <!-- Pricing Section -->
-    <section id="pricing" class="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="text-center mb-16">
-            <h2 class="text-3xl font-bold text-white mb-4">خطط الأسعار والباقات</h2>
-            <p class="text-slate-400">اختر الباقة المناسبة لاحتياجاتك - بدون رسوم خفية</p>
-        </div>
+    <!-- Email -->
+    <div class="mb-3">
+      <label class="text-sm text-slate-400 block mb-1">بريدك الإلكتروني <span class="text-emerald-400">*</span></label>
+      <input id="upload-email" type="email" placeholder="example@gmail.com"
+             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+    </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            
-            <!-- Free Pack -->
-            <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
-                <div>
-                    <h3 class="text-lg font-bold text-white mb-2">التجريبية</h3>
-                    <p class="text-xs text-slate-400 mb-4">لتجربة الخدمة فوراً</p>
-                    <div class="text-3xl font-extrabold text-white mb-6">مجاناً</div>
-                    <ul class="space-y-3 text-sm text-slate-300 mb-8">
-                        <li class="flex items-center gap-2">✓ 3 فحوصات مجانية</li>
-                        <li class="flex items-center gap-2">✓ تقارير فورية بالبريد</li>
-                        <li class="flex items-center gap-2">✓ كشف عيوب رئيسي</li>
-                    </ul>
-                </div>
-                <a href="mailto:akashiiso04@gmail.com" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-center text-sm transition-colors">جرب مجاناً</a>
-            </div>
+    <!-- Description -->
+    <div class="mb-3">
+      <label class="text-sm text-slate-400 block mb-1">وصف المنتج (اختياري)</label>
+      <input id="upload-desc" type="text" placeholder="مثال: آيفون 13 أسود بدون كسر"
+             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+    </div>
 
-            <!-- Basic Pack -->
-            <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between relative">
-                <div>
-                    <h3 class="text-lg font-bold text-white mb-2">الأساسية</h3>
-                    <p class="text-xs text-slate-400 mb-4">مثالية للاستخدام الشخصي</p>
-                    <div class="text-3xl font-extrabold text-white mb-1">$3.99 <span class="text-xs font-normal text-slate-400">(~15 ريال)</span></div>
-                    <p class="text-xs text-emerald-400 mb-6">رصيد لا ينتهي أبداً</p>
-                    <ul class="space-y-3 text-sm text-slate-300 mb-8">
-                        <li class="flex items-center gap-2">✓ 10 فحوصات شاملة</li>
-                        <li class="flex items-center gap-2">✓ تحليل دقيق للعيوب</li>
-                        <li class="flex items-center gap-2">✓ دعم صور متعددة للمنتج</li>
-                        <li class="flex items-center gap-2">✓ صلاحية دائمة للرصيد</li>
-                    </ul>
-                </div>
-                <a href="mailto:akashiiso04@gmail.com" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-center text-sm transition-colors">اشترِ الآن (Apple Pay)</a>
-            </div>
+    <!-- Product images -->
+    <div class="mb-3">
+      <div class="flex justify-between items-end mb-1">
+        <label class="text-sm text-slate-400">صور المنتج <span class="text-emerald-400">*</span></label>
+        <span id="photo-limit-msg" class="text-xs text-slate-500">الحد الأقصى: 1 صورة</span>
+      </div>
+      <input id="upload-image" type="file" accept="image/*" multiple
+             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-500 file:text-slate-950 cursor-pointer"
+             onchange="onImagesSelected(this)">
 
-            <!-- Pro Pack -->
-            <div class="bg-slate-900 rounded-2xl border-2 border-emerald-500/50 p-6 flex flex-col justify-between relative shadow-lg shadow-emerald-500/10">
-                <span class="absolute -top-3 right-6 bg-emerald-500 text-slate-950 text-[10px] font-bold px-3 py-1 rounded-full uppercase">الأكثر مبيعاً</span>
-                <div>
-                    <h3 class="text-lg font-bold text-white mb-2">المتقدمة</h3>
-                    <p class="text-xs text-slate-400 mb-4">للمشترين والمترددين على المعارض</p>
-                    <div class="text-3xl font-extrabold text-white mb-1">$9.99 <span class="text-xs font-normal text-slate-400">(~37.5 ريال)</span></div>
-                    <p class="text-xs text-emerald-400 mb-6">رصيد لا ينتهي أبداً</p>
-                    <ul class="space-y-3 text-sm text-slate-300 mb-8">
-                        <li class="flex items-center gap-2">✓ 30 فحصاً مفصلاً</li>
-                        <li class="flex items-center gap-2">✓ أولوية في المعالجة الفورية</li>
-                        <li class="flex items-center gap-2">✓ تقييم حالة السلعة التقديري</li>
-                        <li class="flex items-center gap-2">✓ صلاحية دائمة للرصيد</li>
-                    </ul>
-                </div>
-                <a href="mailto:akashiiso04@gmail.com" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-center text-sm transition-colors">اشترِ الآن (Apple Pay)</a>
-            </div>
+      <!-- Image preview thumbnails -->
+      <div id="image-previews" class="flex flex-wrap gap-2 mt-2"></div>
 
-            <!-- VIP Pack -->
-            <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
-                <div>
-                    <h3 class="text-lg font-bold text-white mb-2">اشتراك التجار (VIP)</h3>
-                    <p class="text-xs text-slate-400 mb-4">للمعارض وتجار المستعمل</p>
-                    <div class="text-3xl font-extrabold text-white mb-1">$29.99 <span class="text-xs font-normal text-slate-400">/ شهرياً</span></div>
-                    <p class="text-xs text-slate-400 mb-6">تجديد آلي شهرياً</p>
-                    <ul class="space-y-3 text-sm text-slate-300 mb-8">
-                        <li class="flex items-center gap-2">✓ 100 فحص شهرياً</li>
-                        <li class="flex items-center gap-2">✓ أعلى أولوية معالجة</li>
-                        <li class="flex items-center gap-2">✓ تقارير احترافية موسعة</li>
-                        <li class="flex items-center gap-2">✓ دعم بريدي مخصص</li>
-                    </ul>
-                </div>
-                <a href="mailto:akashiiso04@gmail.com" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-center text-sm transition-colors">اشترك الآن</a>
-            </div>
+      <!-- Cost preview -->
+      <div id="cost-preview" class="hidden mt-2 text-xs font-semibold text-emerald-400"></div>
+    </div>
 
-        </div>
-    </section>
+    <!-- Custom logo (optional, VIP/Pro) -->
+    <div id="custom-logo-section" class="mb-4 hidden">
+      <label class="text-sm text-slate-400 block mb-1">
+        شعار متجرك / معرضك
+        <span class="text-xs text-amber-400 mr-1">(اختياري — يظهر في تقرير PDF)</span>
+      </label>
+      <input id="upload-logo" type="file" accept="image/*"
+             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-slate-950 cursor-pointer"
+             onchange="onLogoSelected(this)">
+      <div id="logo-preview-wrap" class="hidden mt-2 flex items-center gap-2">
+        <img id="logo-preview-img" src="" alt="شعار" class="h-10 object-contain rounded border border-slate-600">
+        <span class="text-xs text-slate-400">سيظهر هذا الشعار في أعلى تقرير الفحص</span>
+      </div>
+    </div>
 
-    <!-- Footer -->
-    <footer class="border-t border-slate-800 bg-slate-950 py-8 text-center text-slate-500 text-sm">
-        <p>© 2026 AI Inspector. جميع الحقوق محفوظة لـ editchecker.com</p>
-    </footer>
+    <!-- Submit -->
+    <button id="upload-btn" onclick="submitUpload()"
+            class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
+      <span id="btn-text">فحص الصورة الآن ←</span>
+      <svg id="btn-spinner" class="hidden animate-spin h-4 w-4 text-slate-950" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+    </button>
 
+    <p id="credits-info" class="text-xs text-slate-500 mt-2 text-center"></p>
+    <div id="upload-error" class="hidden mt-3 p-3 bg-red-900/30 border border-red-700 text-red-400 text-sm rounded-lg"></div>
+  </div>
+
+  <div id="result-area" class="hidden max-w-lg mx-auto mt-6"></div>
+  <div id="pdf-area" class="hidden max-w-lg mx-auto mt-4">
+    <button onclick="downloadPDF()"
+            class="w-full flex items-center justify-center gap-2 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-semibold py-2.5 rounded-xl text-sm transition-all">
+      📄 تحميل التقرير PDF
+    </button>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ HOW IT WORKS -->
+<section class="py-20 bg-slate-900/50 border-y border-slate-800">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold text-white mb-4">كيف يعمل النظام؟</h2>
+      <p class="text-slate-400">3 خطوات بسيطة، تقرير احترافي فوري</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800">
+        <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">1</div>
+        <h3 class="text-xl font-bold text-white mb-3">ارفع الصور</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">ارفع صور المنتج من زوايا مختلفة للحصول على تحليل أشمل وأدق (حسب باقتك).</p>
+      </div>
+      <div class="bg-slate-900 p-8 rounded-2xl border border-emerald-500/30 shadow-lg shadow-emerald-500/10">
+        <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">2</div>
+        <h3 class="text-xl font-bold text-white mb-3">تحليل بصري دقيق</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">يمسح النظام الصور بحثاً عن الخدوش والتلفيات وأي تعارض مع وصف البائع.</p>
+      </div>
+      <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800">
+        <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">3</div>
+        <h3 class="text-xl font-bold text-white mb-3">تقرير فوري</h3>
+        <p class="text-slate-400 text-sm leading-relaxed">خلال ثوانٍ تستلم تقريراً تفصيلياً باللغة العربية يوضح حالة المنتج والتوصية النهائية.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ WHY YOU NEED THIS -->
+<section class="py-20 max-w-7xl mx-auto px-4">
+  <div class="text-center mb-14">
+    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold mb-4">⚠️ قبل ما تدفع — اقرأ هذا</span>
+    <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-4">كم مرة اشتريت شيء وندمت؟</h2>
+    <p class="text-slate-400 max-w-2xl mx-auto">البائعون يعرفون كيف يصورون المنتج بزاوية تخفي كل شيء. أنت لا ترى ما وراء الصورة — لكن الذكاء الاصطناعي يرى.</p>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+    <div class="bg-slate-900 border border-red-900/40 rounded-2xl p-6 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-8 translate-x-8"></div>
+      <div class="text-4xl mb-4">📱</div>
+      <h3 class="text-white font-bold text-lg mb-2">الجوال "بدون خدش"</h3>
+      <p class="text-slate-400 text-sm leading-relaxed">دفعت 1,800 ريال على آيفون "بحالة ممتازة"، وبعد التسليم اكتشفت كسراً في الشاشة من الداخل وبطارية محترقة.</p>
+      <div class="mt-4 text-red-400 text-xs font-semibold">خسارة مكنت تتفاداها بـ فحص واحد</div>
+    </div>
+    <div class="bg-slate-900 border border-red-900/40 rounded-2xl p-6 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-8 translate-x-8"></div>
+      <div class="text-4xl mb-4">🚗</div>
+      <h3 class="text-white font-bold text-lg mb-2">السيارة "بدون حوادث"</h3>
+      <p class="text-slate-400 text-sm leading-relaxed">الإعلان قال "فل كامل بدون حوادث". بعد الشراء كشف الفاحص إعادة طلاء في الباب — حادث طُمس بعناية.</p>
+      <div class="mt-4 text-red-400 text-xs font-semibold">الكاميرا لا تكذب — الذكاء الاصطناعي يكشف</div>
+    </div>
+    <div class="bg-slate-900 border border-red-900/40 rounded-2xl p-6 relative overflow-hidden">
+      <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-8 translate-x-8"></div>
+      <div class="text-4xl mb-4">⌚</div>
+      <h3 class="text-white font-bold text-lg mb-2">الساعة "الأصلية 100%"</h3>
+      <p class="text-slate-400 text-sm leading-relaxed">ساعة بـ 600 دولار، الشعار مكتوب غلط بفرق نص ميليمتر، والجلد ينكسر من أول أسبوع.</p>
+      <div class="mt-4 text-red-400 text-xs font-semibold">التزوير الذكي لا يخدع الذكاء الاصطناعي</div>
+    </div>
+  </div>
+  <div class="bg-gradient-to-r from-slate-900 via-emerald-950/30 to-slate-900 border border-emerald-900/30 rounded-2xl p-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1">68%</div><div class="text-xs text-slate-400">من مشتري المستعمل يكتشفون عيوباً لم يعلموا بها</div></div>
+      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1">15 ث</div><div class="text-xs text-slate-400">فقط وقت الفحص الكامل بالذكاء الاصطناعي</div></div>
+      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1">+40</div><div class="text-xs text-slate-400">نقطة فحص تُحلَّل في كل صورة تلقائياً</div></div>
+      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1">$14.99</div><div class="text-xs text-slate-400">فقط مقابل حماية مشترياتك مدى الحياة</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ PRICING -->
+<section id="pricing" class="py-20 max-w-7xl mx-auto px-4">
+  <div class="text-center mb-12">
+    <h2 class="text-3xl font-bold text-white mb-4">الباقات والأسعار</h2>
+    <p class="text-slate-400">استثمر مبلغاً بسيطاً الآن لتتجنب خسارة الآلاف لاحقاً</p>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+
+    <!-- Free -->
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
+      <div>
+        <h3 class="text-lg font-bold text-white mb-1">التجريبية</h3>
+        <p class="text-xs text-slate-400 mb-4">اختبر مجاناً</p>
+        <div class="text-3xl font-extrabold text-white mb-6">مجاناً</div>
+        <ul class="space-y-2 text-sm text-slate-300 mb-8">
+          <li>✓ 3 فحوصات مجانية</li>
+          <li>✓ <strong>صورة واحدة</strong> لكل فحص</li>
+          <li>✓ تقارير فورية وكشف للعيوب</li>
+          <li>✓ تحميل PDF للتقرير</li>
+        </ul>
+      </div>
+      <button onclick="document.getElementById('upload-email').scrollIntoView({behavior:'smooth'})"
+              class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
+        ابدأ مجاناً
+      </button>
+    </div>
+
+    <!-- Basic -->
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
+      <div>
+        <h3 class="text-lg font-bold text-white mb-1">الأساسية</h3>
+        <p class="text-xs text-slate-400 mb-4">للمشتري العرضي</p>
+        <div class="text-3xl font-extrabold text-white mb-1">$4.99</div>
+        <p class="text-xs text-emerald-400 mb-6">رصيد لا ينتهي أبداً</p>
+        <ul class="space-y-2 text-sm text-slate-300 mb-8">
+          <li>✓ 10 فحوصات عالية الدقة</li>
+          <li>✓ <strong>صورة واحدة</strong> لكل فحص</li>
+          <li>✓ تحليل الخدوش ومقارنة الوصف</li>
+          <li>✓ تحميل PDF للتقرير</li>
+          <li>✓ صالح مدى الحياة</li>
+        </ul>
+      </div>
+      <a href="https://ainspector.lemonsqueezy.com/checkout/buy/e810b85b-5273-4da2-9477-f3cf62f9737d"
+         class="lemonsqueezy-button w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-center text-sm transition-colors block">
+        اشترِ الآن
+      </a>
+    </div>
+
+    <!-- Pro -->
+    <div class="bg-slate-900 rounded-2xl border-2 border-emerald-500/50 p-6 flex flex-col justify-between relative shadow-lg shadow-emerald-500/10">
+      <span class="absolute -top-3 right-6 bg-emerald-500 text-slate-950 text-[10px] font-bold px-3 py-1 rounded-full">🔥 الأكثر مبيعاً</span>
+      <div>
+        <h3 class="text-lg font-bold text-white mb-1">المتقدمة (Pro)</h3>
+        <p class="text-xs text-slate-400 mb-4">للمتردد على مواقع المستعمل</p>
+        <div class="text-3xl font-extrabold text-white mb-1">$14.99</div>
+        <p class="text-xs text-emerald-400 mb-6">رصيد لا ينتهي أبداً</p>
+        <ul class="space-y-2 text-sm text-slate-300 mb-8">
+          <li>✓ 50 فحصاً مفصلاً</li>
+          <li>✓ رفع حتى <strong>صورتين</strong> للمنتج</li>
+          <li>✓ كشف العيوب المخفية</li>
+          <li>✓ تحميل PDF للتقرير</li>
+          <li>✓ صالح مدى الحياة</li>
+        </ul>
+      </div>
+      <a href="https://ainspector.lemonsqueezy.com/checkout/buy/db680fa5-9ec4-4fed-81fe-0ad4928266c3"
+         class="lemonsqueezy-button w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-center text-sm transition-colors block">
+        اشترِ الآن
+      </a>
+    </div>
+
+    <!-- VIP -->
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
+      <div>
+        <h3 class="text-lg font-bold text-white mb-1">الأعمال (VIP)</h3>
+        <p class="text-xs text-slate-400 mb-4">للمعارض ومكاتب الفحص</p>
+        <div class="text-3xl font-extrabold text-white mb-1">$49.99<span class="text-sm font-normal text-slate-400">/شهر</span></div>
+        <p class="text-xs text-slate-400 mb-6">تجديد آلي شهرياً</p>
+        <ul class="space-y-2 text-sm text-slate-300 mb-8">
+          <li>✓ 120 فحصاً شهرياً</li>
+          <li>✓ <strong>ترحيل الرصيد</strong> (حتى 200 فحص)</li>
+          <li>✓ رفع حتى <strong>4 صور</strong> للمنتج</li>
+          <li>✓ <strong>White-Label:</strong> شعارك على PDF</li>
+          <li>✓ <strong>🎁 +30 فحص</strong> بعد 3 أشهر</li>
+          <li>✓ أولوية معالجة قصوى ⚡</li>
+        </ul>
+      </div>
+      <a href="https://ainspector.lemonsqueezy.com/checkout/buy/ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072"
+         class="lemonsqueezy-button w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-center text-sm transition-colors block">
+        اشترك الآن
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ FAQ -->
+<section id="faq" class="py-20 bg-slate-900/50 border-y border-slate-800">
+  <div class="max-w-4xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold text-white mb-4">الأسئلة الشائعة</h2>
+      <p class="text-slate-400">كل ما تحتاج معرفته عن طريقة الفحص والرصيد</p>
+    </div>
+    <div class="space-y-4">
+      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
+        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
+          <span>هل يمكنني رفع أكثر من صورة؟</span>
+          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-slate-400 text-sm leading-relaxed mt-3">نعم. باقة Pro تتيح رفع حتى صورتين، وباقة VIP تتيح حتى 4 صور لنفس المنتج من زوايا مختلفة.</p>
+      </details>
+      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
+        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
+          <span>كيف يعمل نظام الرصيد وتدوير الفحوصات؟</span>
+          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-slate-400 text-sm leading-relaxed mt-3">الباقات الأساسية وPro رصيدها لا ينتهي أبداً. باقة VIP تتجدد شهرياً مع ترحيل الرصيد المتبقي (حتى 200 فحص) طالما الاشتراك نشط. عند الإلغاء يُلغى الرصيد المترحل.</p>
+      </details>
+      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
+        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
+          <span>كيف يتم احتساب تكلفة الصور المتعددة؟</span>
+          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-slate-400 text-sm leading-relaxed mt-3">صورة واحدة = فحص واحد. صورتان = فحص واحد. 3 صور = فحصان. 4 صور = فحصان. يُخصم نصف عدد الصور بحد أدنى فحص واحد.</p>
+      </details>
+      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
+        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
+          <span>ما هي ميزة White-Label وشعار المتجر؟</span>
+          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-slate-400 text-sm leading-relaxed mt-3">مشتركو VIP يمكنهم رفع شعار معرضهم ليظهر في أعلى كل تقرير PDF يصدرونه، مما يجعل التقارير تحمل هوية علامتهم التجارية.</p>
+      </details>
+      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
+        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
+          <span>ما هي مكافأة الاستمرارية لعملاء VIP؟</span>
+          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-slate-400 text-sm leading-relaxed mt-3">بعد 3 أشهر متواصلة من الاشتراك النشط، يُمنح تلقائياً 30 فحصاً مجانياً كهدية تقديرية.</p>
+      </details>
+      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
+        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
+          <span>هل التقرير قرار نهائي ملزم؟</span>
+          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
+        </summary>
+        <p class="text-slate-400 text-sm leading-relaxed mt-3">لا. تقرير AI Inspector أداة استشارية بصرية آلية. القرار النهائي يعود إليك دائماً.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ DISCLAIMER -->
+<section class="max-w-7xl mx-auto px-4 mb-12 mt-12">
+  <div class="bg-slate-900/40 border border-slate-800 rounded-xl p-6 text-center">
+    <h4 class="text-amber-500 font-bold mb-3">⚠️ تنويه وإخلاء مسؤولية</h4>
+    <p class="text-xs text-slate-400 leading-relaxed max-w-4xl mx-auto">
+      تقارير "AI Inspector" هي أداة استشارية مساعدة تعتمد على التحليل البصري الآلي، ولا تُعتبر فحصاً ميكانيكياً أو قانونياً شاملاً.
+    </p>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════ FOOTER -->
+<footer class="border-t border-slate-800 py-10 text-center">
+  <div class="flex justify-center mb-4">
+    <img src="/static/logo.png" alt="AI Inspector" class="w-12 h-12 rounded-xl object-cover opacity-80">
+  </div>
+  <p class="text-slate-400 font-semibold mb-1">AI Inspector</p>
+  <p class="text-slate-500 text-sm mb-4">© 2026 جميع الحقوق محفوظة لـ editchecker.com</p>
+  <p class="text-slate-400 text-sm mb-6">
+    للتواصل والدعم الفني:
+    <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 hover:underline font-semibold">akashiiso04@gmail.com</a>
+  </p>
+  <div class="flex flex-wrap justify-center gap-6 text-xs text-slate-500">
+    <button onclick="openModal('modal-privacy')" class="hover:text-emerald-400 transition-colors underline underline-offset-2">سياسة الخصوصية</button>
+    <button onclick="openModal('modal-terms')" class="hover:text-emerald-400 transition-colors underline underline-offset-2">الشروط والأحكام وسياسة الاسترجاع</button>
+    <button onclick="openModal('modal-contact')" class="hover:text-emerald-400 transition-colors underline underline-offset-2">التواصل والدعم الفني</button>
+  </div>
+</footer>
+
+<!-- ════════════════════════════════════════════ JAVASCRIPT -->
+<script>
+/* ════ State ════ */
+let currentPhotoLimit = 1;
+let isExempt          = false;
+let selectedFiles     = [];   // Array of File objects for product images
+
+// 🟢 الحل هنا: تعريف قائمة الإيميلات المحمية/المستثناة لتفادي خطأ undefined
+const PROTECTED_EMAILS = [
+  "akashiiso04@gmail.com",
+  "muhannadd0594@gmail.com",
+  "mohammdlghmd@gmail.com"
+];
+
+/* ════ Modals ════ */
+function openModal(id)  { document.getElementById(id).classList.add('open');    document.body.style.overflow='hidden'; }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); document.body.style.overflow=''; }
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-backdrop.open').forEach(m => m.classList.remove('open'));
+    document.body.style.overflow='';
+  }
+});
+
+/* ════ Helpers ════ */
+function showError(msg) {
+  const el = document.getElementById('upload-error');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+
+function calcCost(n) { return Math.max(1, Math.ceil(n / 2)); }
+
+function updateCostPreview() {
+  const previewEl = document.getElementById('cost-preview');
+  const n = selectedFiles.length;
+  if (n === 0) { previewEl.classList.add('hidden'); return; }
+  if (isExempt) {
+    previewEl.textContent = `${n} صورة — الفحص مجاني (حساب استثنائي) 🎁`;
+    previewEl.classList.remove('hidden');
+    return;
+  }
+  const cost = calcCost(n);
+  previewEl.textContent = `${n} صورة → سيُخصم ${cost} فحص من رصيدك`;
+  previewEl.classList.remove('hidden');
+}
+
+/* ════ Dynamic Email Logic ════ */
+document.getElementById('upload-email').addEventListener('input', function(e) {
+  const email = e.target.value.trim().toLowerCase();
+  const limitMsg = document.getElementById('photo-limit-msg');
+  const logoSec = document.getElementById('custom-logo-section');
+  const creditsInfo = document.getElementById('credits-info');
+
+  if (typeof PROTECTED_EMAILS !== 'undefined' && PROTECTED_EMAILS.includes(email)) {
+    isExempt = true;
+    currentPhotoLimit = 4;
+    limitMsg.textContent = 'الحد الأقصى: 4 صور (حساب استثنائي)';
+    logoSec.classList.remove('hidden');
+    creditsInfo.textContent = '⚡ حساب مسؤول / استثنائي: فحوصات غير محدودة';
+  } else {
+    isExempt = false;
+    currentPhotoLimit = 1;
+    limitMsg.textContent = 'الحد الأقصى: 1 صورة';
+    logoSec.classList.add('hidden');
+    creditsInfo.textContent = '';
+  }
+  updateCostPreview();
+});
+
+/* ════ Image Preview ════ */
+function renderPreviews() {
+  const container = document.getElementById('image-previews');
+  container.innerHTML = '';
+  selectedFiles.forEach((file, idx) => {
+    const url  = URL.createObjectURL(file);
+    const wrap = document.createElement('div');
+    wrap.className = 'preview-thumb';
+    wrap.innerHTML = `
+      <img src="${url}" alt="صورة ${idx+1}">
+      <button type="button" class="remove-btn" onclick="removeImage(${idx})" title="حذف">×</button>`;
+    container.appendChild(wrap);
+  });
+  updateCostPreview();
+}
+
+function removeImage(idx) {
+  selectedFiles.splice(idx, 1);
+  renderPreviews();
+  const dt = new DataTransfer();
+  selectedFiles.forEach(f => dt.items.add(f));
+  document.getElementById('upload-image').files = dt.files;
+}
+
+function onImagesSelected(input) {
+  document.getElementById('upload-error').classList.add('hidden');
+  
+  const newFiles = Array.from(input.files);
+  let combinedFiles = selectedFiles.concat(newFiles);
+  
+  if (combinedFiles.length > currentPhotoLimit) {
+    showError(`باقتك تسمح بـ ${currentPhotoLimit} صورة كحد أقصى.`);
+    combinedFiles = combinedFiles.slice(0, currentPhotoLimit);
+  }
+  
+  selectedFiles = combinedFiles;
+  
+  const dt = new DataTransfer();
+  selectedFiles.forEach(f => dt.items.add(f));
+  input.files = dt.files;
+  
+  renderPreviews();
+}
+
+/* ════ Custom Logo Preview ════ */
+function onLogoSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  document.getElementById('logo-preview-img').src = url;
+  document.getElementById('logo-preview-wrap').classList.remove('hidden');
+}
+
+/* ════ Credits Check on Email Blur ════ */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('upload-email').addEventListener('blur', async function () {
+    const email = this.value.trim();
+    if (!email) return;
+    
+    try {
+      const r = await fetch(`/credits?email=${encodeURIComponent(email)}`);
+      
+      // معالجة مشكلة 404 (مثلاً: حساب غير موجود أو الرابط خاطئ)
+      if (r.status === 404) {
+        console.warn('لم يتم العثور على بيانات الحساب (404). قد يكون مستخدماً جديداً.');
+        document.getElementById('credits-info').textContent = 'لا توجد بيانات سابقة لهذا الحساب.';
+        return;
+      }
+
+      if (!r.ok) throw new Error(`HTTP Error: ${r.status}`);
+      
+      const d = await r.json();
+      if (d.credits !== undefined) {
+        let isExempt = d.is_exempt || false;
+        let currentPhotoLimit = d.photo_limit || 1;
+
+        const planLabel = d.plan === 'exempt' ? 'مفتوح / استثناء' : d.plan;
+        document.getElementById('credits-info').textContent =
+          isExempt
+            ? `حساب استثنائي — فحوصات غير محدودة (باقة: ${planLabel}) 🎁`
+            : `رصيدك الحالي: ${d.credits} فحص (باقة: ${planLabel})`;
+
+        // تحديث حقل رفع الصور بناءً على صلاحيات الباقة
+        const fileInput = document.getElementById('upload-image');
+        const limitMsg  = document.getElementById('photo-limit-msg');
+        if (currentPhotoLimit > 1) {
+          fileInput.setAttribute('multiple', 'multiple');
+          limitMsg.textContent = `الحد الأقصى: ${currentPhotoLimit} صور`;
+        } else {
+          fileInput.removeAttribute('multiple');
+          limitMsg.textContent = 'الحد الأقصى: 1 صورة';
+        }
+
+        // إظهار قسم الشعار المخصص لباقات VIP أو الاستثنائية
+        const logoSection = document.getElementById('custom-logo-section');
+        if (d.plan === 'vip' || d.plan === 'exempt') {
+          logoSection.classList.remove('hidden');
+        } else {
+          logoSection.classList.add('hidden');
+        }
+
+        if (typeof updateCostPreview === 'function') updateCostPreview();
+      }
+    } catch (e) {
+      console.error('حدث خطأ أثناء جلب الرصيد:', e);
+    }
+  });
+});
+
+/* ════ Submit ════ */
+async function submitUpload() {
+  const email   = document.getElementById('upload-email').value.trim().toLowerCase();
+  const desc    = document.getElementById('upload-desc').value.trim();
+  const errEl   = document.getElementById('upload-error');
+  const resEl   = document.getElementById('result-area');
+  const pdfArea = document.getElementById('pdf-area');
+  const btn     = document.getElementById('upload-btn');
+  const spinner = document.getElementById('btn-spinner');
+  const btnText = document.getElementById('btn-text');
+
+  // دالة لإعادة الزر لحالته الطبيعية
+  const resetBtnUI = () => {
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+    btnText.textContent = 'فحص الصورة الآن ←';
+  };
+
+  const displayError = (msg) => {
+    if(typeof showError === 'function') showError(msg);
+    else { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+    resetBtnUI(); // إيقاف التحميل عند وجود خطأ
+  };
+
+  errEl.classList.add('hidden');
+  resEl.classList.add('hidden');
+  pdfArea.classList.add('hidden');
+
+  if (!email) { displayError('يرجى إدخال بريدك الإلكتروني'); return; }
+  if (typeof selectedFiles === 'undefined' || selectedFiles.length === 0) { 
+    displayError('يرجى اختيار صورة واحدة على الأقل'); return; 
+  }
+
+  let userSecretCode = '';
+
+  // 1. التحقق المسبق في الفرونت إند من قائمة الإيميلات المحمية
+  if (typeof PROTECTED_EMAILS !== 'undefined' && PROTECTED_EMAILS.includes(email)) {
+    const entered = prompt('🔒 هذا الحساب محمي.\nيرجى إدخال الرمز السري للمتابعة:');
+    if (entered === null) return; // تم الإلغاء
+    if (entered.trim() === '') { displayError('الرمز السري مطلوب للمتابعة.'); return; }
+    userSecretCode = entered.trim();
+  }
+
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  btnText.textContent = 'جاري الرفع...';
+
+  // دالة مساعدة لتجهيز وإرسال الطلب
+  const sendRequest = async (secret) => {
+    const form = new FormData();
+    form.append('email', email);
+    form.append('description', desc);
+    if (secret) form.append('secret_code', secret);
+
+    selectedFiles.forEach(f => form.append('image', f));
+
+    const logoInput = document.getElementById('upload-logo');
+    if (logoInput && logoInput.files.length > 0) {
+      form.append('custom_logo', logoInput.files[0]);
+    }
+
+    return await fetch('/upload', { method: 'POST', body: form });
+  };
+
+  try {
+    let resp = await sendRequest(userSecretCode);
+    
+    // 2. إذا رد السيرفر بـ 401 (يتطلب رمز سري)، نطلبه ونعيد الإرسال
+    if (resp.status === 401) {
+      const errorData = await resp.json();
+      const entered = prompt(`🔒 ${errorData.message || 'هذا الحساب محمي.'}\nيرجى إدخال الرمز السري:`);
+      if (entered && entered.trim() !== '') {
+        userSecretCode = entered.trim();
+        resp = await sendRequest(userSecretCode); 
+      } else {
+        displayError('الرمز السري مطلوب للمتابعة.');
+        return;
+      }
+    }
+    
+    // معالجة باقي الأخطاء
+    if (resp.status === 404) { displayError('حدث خطأ 404: الخادم أو الرابط غير موجود.'); return; }
+    if (resp.status === 403) {
+      const errorData = await resp.json();
+      displayError(errorData.message || 'الرمز السري غير صحيح أو أنك لا تملك صلاحية الوصول.');
+      return;
+    }
+    if (resp.status === 402) {
+      displayError('نفد رصيدك. اشترِ باقة للاستمرار.');
+      document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+    
+    const data = await resp.json();
+    if (!resp.ok || data.error) { 
+      displayError(data.message || data.error || 'حدث خطأ، حاول مرة أخرى'); 
+      return; 
+    }
+
+    // 3. التعديل الجديد (Polling)
+    if (data.job_id) {
+        btnText.textContent = 'جاري التحليل...';
+        pollStatus(data.job_id); // نبدأ بفحص الحالة
+    } else if (data.report) {
+        // كاحتياط إذا أرجع السيرفر التقرير مباشرة
+        handleSuccess(data);
+    } else {
+        displayError('استجابة غير متوقعة من الخادم.');
+    }
+
+  } catch (e) {
+    console.error('Upload Error:', e);
+    displayError('خطأ في الاتصال، تحقق من الشبكة وحاول مجدداً');
+  }
+
+  // --- دوال مساعدة للتعامل مع الـ Polling والنجاح ---
+
+  // دالة الاستعلام الدوري (Polling)
+  async function pollStatus(jobId) {
+    try {
+        // إذا كان مسار السيرفر عندك يستخدم بارامتر، استبدل السطر التالي بـ: fetch(`/status?job_id=${jobId}`)
+        const res = await fetch(`/status/${jobId}`); 
+        const statusData = await res.json();
+
+        if (statusData.status === 'completed' || statusData.status === 'done') {
+            handleSuccess(statusData);
+        } else if (statusData.status === 'failed' || statusData.status === 'error') {
+            displayError(statusData.error || 'فشل في تحليل الملف');
+        } else {
+            // الحالة لا زالت "processing"
+            btnText.textContent = 'جاري المعالجة (قد يستغرق بعض الوقت)...';
+            setTimeout(() => pollStatus(jobId), 1500); // يفحص مرة أخرى بعد ثانية ونصف
+        }
+    } catch (err) {
+        console.error('Polling Error:', err);
+        displayError('فقد الاتصال أثناء انتظار النتيجة.');
+    }
+  }
+
+  // دالة معالجة النجاح وعرض التقرير
+  function handleSuccess(resultData) {
+    /* حفظ البيانات وعرض التقرير */
+    window._lastReportHtml   = resultData.report;
+    window._lastDesc         = desc || 'تقرير فحص المنتج';
+    window._lastImagesB64    = resultData.images_b64 || [];
+    window._lastCustomLogo   = resultData.custom_logo_b64 || '';
+
+    resEl.innerHTML = resultData.report;
+    resEl.classList.remove('hidden');
+    pdfArea.classList.remove('hidden');
+    resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const planLabel = resultData.plan === 'exempt' ? 'مفتوح / استثناء' : (resultData.plan || '');
+    const creditsInfo = document.getElementById('credits-info');
+    if (creditsInfo) {
+      creditsInfo.textContent = resultData.is_exempt
+        ? `حساب استثنائي — فحوصات غير محدودة (باقة: ${planLabel}) 🎁`
+        : `الرصيد المتبقي: ${resultData.credits} فحص (خُصم ${resultData.cost} فحص)`;
+    }
+    
+    // إنهاء حالة التحميل للزر
+    resetBtnUI();
+  }
+}
+  
+/* ════ PDF Generator ════ */
+function downloadPDF() {
+  if (!window._lastReportHtml) { alert('لا يوجد تقرير لتحميله بعد.'); return; }
+
+  const desc = window._lastDesc || 'تقرير فحص المنتج';
+  const date = new Date().toLocaleDateString('ar-SA', { year:'numeric', month:'long', day:'numeric' });
+
+  /* إعادة تنسيق الألوان للطباعة */
+  const tmp = document.createElement('div');
+  tmp.innerHTML = window._lastReportHtml;
+  
+  tmp.querySelectorAll('*').forEach(el => {
+    if (el.style) {
+      const bg = el.style.backgroundColor;
+      const col = el.style.color;
+
+      if (bg === 'rgb(15, 23, 42)' || bg === '#0f172a') el.style.backgroundColor = '#f8fafc';
+      else if (bg === 'rgb(30, 41, 59)' || bg === '#1e293b') el.style.backgroundColor = '#f1f5f9';
+      else if (bg === 'rgb(24, 34, 52)' || bg === '#182234') el.style.backgroundColor = '#f1f5f9';
+      else if (bg === 'rgba(17, 46, 35, 1)') el.style.backgroundColor = '#ecfdf5';
+      else if (bg === 'rgb(51, 65, 85)' || bg === '#334155') el.style.backgroundColor = '#e2e8f0';
+
+      if (col === 'rgb(248, 250, 252)' || col === '#f8fafc') el.style.color = '#0f172a';
+      else if (col === 'rgb(226, 232, 240)' || col === '#e2e8f0') el.style.color = '#1e293b';
+      else if (col === 'rgb(203, 213, 225)' || col === '#cbd5e1') el.style.color = '#334155';
+      else if (col === 'rgb(148, 163, 184)' || col === '#94a3b8') el.style.color = '#475569';
+      else if (col === 'rgb(100, 116, 139)' || col === '#64748b') el.style.color = '#475569';
+
+      el.style.boxShadow = 'none';
+    }
+  });
+
+  const reportBody = tmp.innerHTML;
+  const siteLogo = window.location.origin + '/static/logo.png';
+
+  const printHTML = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>تقرير فحص المنتج — AI Inspector</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Tajawal','Segoe UI',Arial,sans-serif;background:#fff;color:#0f172a;direction:rtl;
+     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.pdf-header{background:#0f172a;color:#fff;padding:18px 24px;display:flex;align-items:center;
+            justify-content:space-between;border-radius:0 0 12px 12px;margin-bottom:20px;}
+.pdf-header .brand{display:flex;align-items:center;gap:12px;}
+.pdf-header .brand img{width:48px;height:48px;border-radius:10px;object-fit:cover;}
+.pdf-header .brand-name{font-size:22px;font-weight:800;color:#34d399;}
+.pdf-header .brand-url{font-size:11px;color:#94a3b8;margin-top:2px;}
+.pdf-header .meta{text-align:left;}
+.pdf-header .meta .report-label{font-size:13px;color:#94a3b8;}
+.pdf-header .meta .report-date{font-size:12px;color:#cbd5e1;margin-top:3px;}
+.pdf-product{background:#f1f5f9;border-right:4px solid #34d399;padding:10px 16px;
+             margin:0 0 20px;border-radius:0 8px 8px 0;font-size:13px;}
+.pdf-product .label{color:#64748b;font-size:11px;margin-bottom:3px;}
+.pdf-product .value{color:#0f172a;font-weight:700;font-size:14px;}
+.pdf-body{padding:0 4px;}
+.pdf-body *{font-family:'Tajawal','Segoe UI',Arial,sans-serif!important;}
+.pdf-footer{margin-top:24px;border-top:1px solid #e2e8f0;padding-top:12px;
+            text-align:center;font-size:10px;color:#94a3b8;}
+.pdf-body img{border:1px solid #e2e8f0!important;}
+@page{size:A4 portrait;margin:12mm 14mm;}
+@media print{body{background:#fff!important;}
+  .pdf-header{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+</style>
+</head>
+<body>
+<div class="pdf-header">
+  <div class="brand">
+    <img src="${siteLogo}" alt="AI Inspector Logo" onerror="this.style.display='none'">
+    <div><div class="brand-name">AI Inspector</div><div class="brand-url">editchecker.com</div></div>
+  </div>
+  <div class="meta">
+    <div class="report-label">تقرير فحص المنتج</div>
+    <div class="report-date">${date}</div>
+  </div>
+</div>
+<div class="pdf-product">
+  <div class="label">المنتج / الوصف</div>
+  <div class="value">${desc}</div>
+</div>
+<div class="pdf-body">${reportBody}</div>
+<div class="pdf-footer">
+  هذا التقرير صادر من نظام AI Inspector على editchecker.com — تحليل استرشادي آلي غير ملزم قانونياً
+</div>
+<script>document.fonts.ready.then(()=>{setTimeout(()=>{window.print();},600);});<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=800,height=900');
+  if (!win) { alert('يرجى السماح بالنوافذ المنبثقة لتحميل التقرير PDF.'); return; }
+  win.document.open();
+  win.document.write(printHTML);
+  win.document.close();
+}
+</script>
 </body>
 </html>
