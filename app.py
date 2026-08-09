@@ -202,6 +202,12 @@ def favicon_redirect():
         return app.send_static_file('logo.png')
     return send_file(io.BytesIO(FALLBACK_LOGO_PNG), mimetype='image/png', as_attachment=False)
 
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory(
+        os.path.join(_ROOT, 'static'),
+        filename
+    )
 
 
 # ─── User Helpers ─────────────────────────────────────────────────────────────
