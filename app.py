@@ -11,7 +11,7 @@ import threading
 import uuid
 import time
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory, send_file, Response
 import requests
 import psycopg2
 import psycopg2.extras
@@ -41,12 +41,18 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("ai-inspector")
 
 # ─── Config ──────────────────────────────────────────────────────────────────
-OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "")
-LEMONSQUEEZY_SECRET = os.environ.get("LEMONSQUEEZY_SECRET", "")
+OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "").strip()
+LEMONSQUEEZY_SECRET = os.environ.get("LEMONSQUEEZY_SECRET", "").strip()
 ADMIN_SECRET_CODE   = os.environ.get("ADMIN_SECRET_CODE", "").strip()
-SITE_URL            = "ai-inspector-tau.vercel.app"
+SITE_URL            = os.environ.get("VERCEL_PROJECT_PRODUCTION_URL", "ai-inspector-tau.vercel.app") or "ai-inspector-tau.vercel.app"
 FREE_CREDITS        = 3
 EXEMPT_CREDITS      = 999
+
+FALLBACK_LOGO_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAJAAAAB6CAYAAAAF" \
+    "c1g9AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJ0UkG" \
+    "AAAAAAgI0AABz7lNQAAAAJ0UkGAAAAAABJRU5ErkJggg=="
+)
 
 # ─── PostgreSQL (Neon) ────────────────────────────────────────────────────────
 # Neon ترسل "postgres://" لكن psycopg2 يحتاج "postgresql://"
@@ -67,6 +73,32 @@ PLAN_CREDITS = {
 }
 
 PHOTO_LIMIT_MAP = {"free": 1, "basic": 1, "pro": 2, "vip": 4, "exempt": 4}
+
+def fallback_homepage_html():
+    return """<!doctype html>
+<html lang=\"ar\" dir=\"rtl\">
+<head>
+  <meta charset=\"utf-8\">
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
+  <title>AI Inspector</title>
+  <style>
+    body { font-family: Tahoma, Arial, sans-serif; background: #020617; color: #e2e8f0; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .box { max-width: 700px; background: rgba(15,23,42,0.95); border: 1px solid #334155; border-radius: 20px; text-align: center; padding: 40px 28px; box-shadow: 0 30px 80px rgba(0,0,0,0.45); }
+    .badge { display: inline-block; padding: 8px 14px; border-radius: 999px; background: rgba(16,185,129,.12); color: #6ee7b7; border: 1px solid rgba(16,185,129,.3); font-weight: 700; margin-bottom: 18px; }
+    h1 { font-size: clamp(2rem, 4vw, 3.2rem); margin: 0 0 14px; }
+    p { color: #cbd5e1; line-height: 1.8; }
+    a { color: #34d399; }
+  </style>
+</head>
+<body>
+  <div class=\"box\">
+    <div class=\"badge\">AI Inspector</div>
+    <h1>قيد التحديث الآن</h1>
+    <p>الموقع قيد إعادة تجهيز النشر، وقد تم استبدال القالب الافتراضي مؤقتاً حتى يتم استعادة الملفات المطلوبة.</p>
+    <p>إذا كنت تدير النشر، تأكد من وجود مجلد <strong>templates</strong> وملف <strong>index.html</strong> داخل المشروع، أو أعد النشر بعد رفع الملفات.</p>
+  </div>
+</body>
+</html>"""
 
 # ─── Temp Email Domains Blacklist ────────────────────────────────────────────
 TEMP_EMAIL_DOMAINS = {
@@ -167,12 +199,27 @@ except Exception as _e:
 # ─── Routes (home) ───────────────────────────────────────────────────────────
 @app.route('/')
 def home():
-    return render_template('index.html')
+    index_path = os.path.join(template_dir, 'index.html')
+    if os.path.exists(index_path):
+        return render_template('index.html')
+    return Response(fallback_homepage_html(), mimetype='text/html; charset=utf-8')
 
 @app.route('/favicon.ico')
 @app.route('/favicon.png')
 def favicon_redirect():
-    return app.send_static_file('logo.png')
+    logo_path = os.path.join(static_dir, 'logo.png')
+    if os.path.exists(logo_path):
+        return app.send_static_file('logo.png')
+    return send_file(io.BytesIO(FALLBACK_LOGO_PNG), mimetype='image/png', as_attachment=False)
+
+@app.route('/static/<path:filename>')
+def serve_static_file(filename):
+    safe_path = os.path.join(static_dir, filename)
+    if os.path.exists(safe_path):
+        return send_from_directory(static_dir, filename)
+    if filename in {'logo.png', 'og-image.png', 'image.png'}:
+        return send_file(io.BytesIO(FALLBACK_LOGO_PNG), mimetype='image/png', as_attachment=False)
+    return jsonify({"error": "not found"}), 404
 
 # ─── User Helpers ─────────────────────────────────────────────────────────────
 def is_exempt(email_addr):
@@ -373,6 +420,9 @@ Give a unified overall_score that reflects all images combined."""
     }
 
     try:
+        if not OPENROUTER_API_KEY:
+            raise RuntimeError("OPENROUTER_API_KEY is missing")
+
         resp = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             json=payload,
