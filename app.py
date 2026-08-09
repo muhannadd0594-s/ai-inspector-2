@@ -19,7 +19,12 @@ from PIL import Image
 
 load_dotenv()
 
-app = Flask(__name__)
+# تحديد المسارات المطلقة لضمان العثور على القوالب والملفات على Vercel
+base_dir = os.path.dirname(os.path.abspath(__file__))
+template_dir = os.path.join(base_dir, 'templates')
+static_dir = os.path.join(base_dir, 'static')
+
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32 MB
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
