@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html id="html-root" lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,27 +9,20 @@
   <meta name="description" content="افحص أي منتج مستعمل قبل الشراء بدقة الخبراء — جوالات، سيارات، ساعات، ملابس.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://ai-inspector-tau.vercel.app/">
-  
-  <!-- Open Graph / Facebook / WhatsApp -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://ai-inspector-tau.vercel.app/">
   <meta property="og:title" content="AI Inspector | فحص المنتجات المستعملة بالذكاء الاصطناعي">
   <meta property="og:description" content="افحص أي منتج مستعمل قبل الشراء. تقرير احترافي فوري باللغة العربية.">
   <meta property="og:locale" content="ar_SA">
-  
-  <!-- رابط الصورة المباشر من Vercel CDN -->
   <meta property="og:image" content="https://ai-inspector-tau.vercel.app/static/og-image.png">
   <meta property="og:image:secure_url" content="https://ai-inspector-tau.vercel.app/static/og-image.png">
   <meta property="og:image:type" content="image/png">
   <meta property="og:image:width" content="630">
   <meta property="og:image:height" content="630">
-  
-  <!-- Twitter / X -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="AI Inspector | فحص المنتجات المستعملة بالذكاء الاصطناعي">
   <meta name="twitter:description" content="افحص أي منتج مستعمل قبل الشراء. تقرير احترافي فوري باللغة العربية.">
   <meta name="twitter:image" content="https://ai-inspector-tau.vercel.app/static/og-image.png">
-  
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://assets.lemonsqueezy.com/lemon.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
@@ -43,15 +36,10 @@
     }
     .modal-backdrop.open { display: flex; }
     details summary::-webkit-details-marker { display: none; }
-
-    /* Image preview thumbnails */
-    .preview-thumb {
-      position: relative; display: inline-block;
-    }
+    .preview-thumb { position: relative; display: inline-block; }
     .preview-thumb img {
       width: 72px; height: 72px; object-fit: cover;
-      border-radius: 8px; border: 2px solid #334155;
-      display: block;
+      border-radius: 8px; border: 2px solid #334155; display: block;
     }
     .preview-thumb .remove-btn {
       position: absolute; top: -6px; left: -6px;
@@ -60,70 +48,331 @@
       font-size: 10px; cursor: pointer; line-height: 18px;
       text-align: center; font-weight: bold;
     }
+    [dir="ltr"] .preview-thumb .remove-btn { left: auto; right: -6px; }
+    /* Language toggle active state */
+    .lang-btn-active { background: #10b981; color: #020617; }
+    .lang-btn-inactive { color: #94a3b8; }
+    .lang-btn-inactive:hover { color: #fff; }
+    /* Direction-aware form text */
+    [dir="ltr"] .form-box { text-align: left; }
+    [dir="ltr"] .form-label { text-align: left; }
   </style>
-    <script defer src="/_vercel/insights/script.js"></script>
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 antialiased">
 
-<!-- ════════════════════════════════════════════ MODALS -->
+<!-- ════ TRANSLATIONS ════ -->
+<script>
+const T = {
+  ar: {
+    nav_pricing: 'الأسعار', nav_faq: 'الأسئلة الشائعة', nav_support: 'الدعم الفني',
+    nav_plans_btn: 'الباقات والأسعار',
+    hero_badge: '🚀 مدعوم بأحدث نماذج الذكاء الاصطناعي لفحص الصور',
+    hero_h1_1: 'اكتشف أدق العيوب في المنتجات',
+    hero_h1_2: 'بدقة الخبراء وفي ثوانٍ',
+    hero_p: 'ارفع صور المنتج مع وصف قصير، وسيرسل نظامنا تقريراً تشخيصياً احترافياً فورياً.',
+    form_title: '🔍 افحص منتجك الآن',
+    form_email_label: 'بريدك الإلكتروني', form_email_ph: 'example@gmail.com',
+    form_desc_label: 'وصف المنتج (اختياري)', form_desc_ph: 'مثال: آيفون 13 أسود بدون كسر',
+    form_images_label: 'صور المنتج', form_required: '*',
+    form_photo_limit_default: 'الحد الأقصى: 1 صورة',
+    form_logo_label: 'شعار متجرك / معرضك',
+    form_logo_note: '(اختياري — يظهر في تقرير PDF)',
+    form_logo_hint: 'سيظهر هذا الشعار في أعلى تقرير الفحص',
+    form_btn: 'فحص الصورة الآن ←',
+    btn_uploading: 'جاري الرفع...', btn_analyzing: 'جاري التحليل...',
+    btn_processing: 'جاري المعالجة (قد يستغرق بعض الوقت)...',
+    pdf_btn: '📄 تحميل التقرير PDF',
+    hiw_title: 'كيف يعمل النظام؟', hiw_sub: '3 خطوات بسيطة، تقرير احترافي فوري',
+    hiw_1_title: 'ارفع الصور', hiw_1_desc: 'ارفع صور المنتج من زوايا مختلفة للحصول على تحليل أشمل وأدق (حسب باقتك).',
+    hiw_2_title: 'تحليل بصري دقيق', hiw_2_desc: 'يمسح النظام الصور بحثاً عن الخدوش والتلفيات وأي تعارض مع وصف البائع.',
+    hiw_3_title: 'تقرير فوري', hiw_3_desc: 'خلال ثوانٍ تستلم تقريراً تفصيلياً باللغة العربية يوضح حالة المنتج والتوصية النهائية.',
+    why_badge: '⚠️ قبل ما تدفع — اقرأ هذا',
+    why_title: 'كم مرة اشتريت شيء وندمت؟',
+    why_sub: 'البائعون يعرفون كيف يصورون المنتج بزاوية تخفي كل شيء. أنت لا ترى ما وراء الصورة — لكن الذكاء الاصطناعي يرى.',
+    why_1_title: 'الجوال "بدون خدش"', why_1_desc: 'دفعت 1,800 ريال على آيفون "بحالة ممتازة"، وبعد التسليم اكتشفت كسراً في الشاشة من الداخل وبطارية محترقة.', why_1_tag: 'خسارة مكنت تتفاداها بـ فحص واحد',
+    why_2_title: 'السيارة "بدون حوادث"', why_2_desc: 'الإعلان قال "فل كامل بدون حوادث". بعد الشراء كشف الفاحص إعادة طلاء في الباب — حادث طُمس بعناية.', why_2_tag: 'الكاميرا لا تكذب — الذكاء الاصطناعي يكشف',
+    why_3_title: 'الساعة "الأصلية 100%"', why_3_desc: 'ساعة بـ 600 دولار، الشعار مكتوب غلط بفرق نص ميليمتر، والجلد ينكسر من أول أسبوع.', why_3_tag: 'التزوير الذكي لا يخدع الذكاء الاصطناعي',
+    stat_1_val: '68%', stat_1_label: 'من مشتري المستعمل يكتشفون عيوباً لم يعلموا بها',
+    stat_2_val: '15 ث', stat_2_label: 'فقط وقت الفحص الكامل بالذكاء الاصطناعي',
+    stat_3_val: '+40', stat_3_label: 'نقطة فحص تُحلَّل في كل صورة تلقائياً',
+    stat_4_val: '$14.99', stat_4_label: 'فقط مقابل حماية مشترياتك مدى الحياة',
+    pricing_title: 'الباقات والأسعار', pricing_sub: 'استثمر مبلغاً بسيطاً الآن لتتجنب خسارة الآلاف لاحقاً',
+    free_name: 'التجريبية', free_tagline: 'اختبر مجاناً', free_price: 'مجاناً',
+    free_f1: '✓ 3 فحوصات مجانية', free_f2: '✓ <strong>صورة واحدة</strong> لكل فحص',
+    free_f3: '✓ تقارير فورية وكشف للعيوب', free_f4: '✓ تحميل PDF للتقرير', free_btn: 'ابدأ مجاناً',
+    basic_name: 'الأساسية', basic_tagline: 'للمشتري العرضي', basic_badge: 'رصيد لا ينتهي أبداً',
+    basic_f1: '✓ 10 فحوصات عالية الدقة', basic_f2: '✓ <strong>صورة واحدة</strong> لكل فحص',
+    basic_f3: '✓ تحليل الخدوش ومقارنة الوصف', basic_f4: '✓ تحميل PDF للتقرير', basic_f5: '✓ صالح مدى الحياة', basic_btn: 'اشترِ الآن',
+    pro_hot: '🔥 الأكثر مبيعاً', pro_name: 'المتقدمة (Pro)', pro_tagline: 'للمتردد على مواقع المستعمل', pro_badge: 'رصيد لا ينتهي أبداً',
+    pro_f1: '✓ 50 فحصاً مفصلاً', pro_f2: '✓ رفع حتى <strong>صورتين</strong> للمنتج',
+    pro_f3: '✓ كشف العيوب المخفية', pro_f4: '✓ تحميل PDF للتقرير', pro_f5: '✓ صالح مدى الحياة', pro_btn: 'اشترِ الآن',
+    vip_name: 'الأعمال (VIP)', vip_tagline: 'للمعارض ومكاتب الفحص', vip_period: '/شهر', vip_renew: 'تجديد آلي شهرياً',
+    vip_f1: '✓ 120 فحصاً شهرياً', vip_f2: '✓ <strong>ترحيل الرصيد</strong> (حتى 200 فحص)',
+    vip_f3: '✓ رفع حتى <strong>4 صور</strong> للمنتج', vip_f4: '✓ <strong>White-Label:</strong> شعارك على PDF',
+    vip_f5: '✓ <strong>🎁 +30 فحص</strong> بعد 3 أشهر', vip_f6: '✓ أولوية معالجة قصوى ⚡', vip_btn: 'اشترك الآن',
+    faq_title: 'الأسئلة الشائعة', faq_sub: 'كل ما تحتاج معرفته عن طريقة الفحص والرصيد',
+    faq_1_q: 'هل يمكنني رفع أكثر من صورة؟', faq_1_a: 'نعم. باقة Pro تتيح رفع حتى صورتين، وباقة VIP تتيح حتى 4 صور لنفس المنتج من زوايا مختلفة.',
+    faq_2_q: 'كيف يعمل نظام الرصيد وتدوير الفحوصات؟', faq_2_a: 'الباقات الأساسية وPro رصيدها لا ينتهي أبداً. باقة VIP تتجدد شهرياً مع ترحيل الرصيد المتبقي (حتى 200 فحص) طالما الاشتراك نشط. عند الإلغاء يُلغى الرصيد المترحل.',
+    faq_3_q: 'كيف يتم احتساب تكلفة الصور المتعددة؟', faq_3_a: 'صورة واحدة = فحص واحد. صورتان = فحص واحد. 3 صور = فحصان. 4 صور = فحصان. يُخصم نصف عدد الصور بحد أدنى فحص واحد.',
+    faq_4_q: 'ما هي ميزة White-Label وشعار المتجر؟', faq_4_a: 'مشتركو VIP يمكنهم رفع شعار معرضهم ليظهر في أعلى كل تقرير PDF يصدرونه، مما يجعل التقارير تحمل هوية علامتهم التجارية.',
+    faq_5_q: 'ما هي مكافأة الاستمرارية لعملاء VIP؟', faq_5_a: 'بعد 3 أشهر متواصلة من الاشتراك النشط، يُمنح تلقائياً 30 فحصاً مجانياً كهدية تقديرية.',
+    faq_6_q: 'هل التقرير قرار نهائي ملزم؟', faq_6_a: 'لا. تقرير AI Inspector أداة استشارية بصرية آلية. القرار النهائي يعود إليك دائماً.',
+    disclaimer_title: '⚠️ تنويه وإخلاء مسؤولية',
+    disclaimer_text: 'تقارير "AI Inspector" هي أداة استشارية مساعدة تعتمد على التحليل البصري الآلي، ولا تُعتبر فحصاً ميكانيكياً أو قانونياً شاملاً.',
+    footer_rights: '© 2026 جميع الحقوق محفوظة لـ editchecker.com',
+    footer_contact_label: 'للتواصل والدعم الفني:', footer_privacy: 'سياسة الخصوصية',
+    footer_terms: 'الشروط والأحكام وسياسة الاسترجاع', footer_support: 'التواصل والدعم الفني',
+    modal_privacy_title: 'سياسة الخصوصية',
+    modal_privacy_body: `<p><strong class="text-white">آخر تحديث:</strong> يناير 2026</p>
+<h3 class="text-emerald-400 font-bold text-base">1. البيانات التي نجمعها</h3>
+<ul class="list-disc list-inside space-y-1 pr-4"><li>عنوان البريد الإلكتروني — لتتبع رصيد الفحوصات.</li><li>صورة المنتج المرفوعة — لإجراء التحليل الآلي فقط.</li><li>وصف المنتج (اختياري) — لتعزيز دقة التحليل.</li></ul>
+<h3 class="text-emerald-400 font-bold text-base">2. كيف نستخدم بياناتك</h3>
+<p>تُستخدم صورة المنتج حصرياً لتوليد تقرير الفحص الآلي. <strong class="text-white">يتم حذف الصورة تلقائياً فور اكتمال المعالجة.</strong></p>
+<h3 class="text-emerald-400 font-bold text-base">3. الدفع الإلكتروني</h3>
+<p>تتم عمليات الدفع عبر منصة <strong class="text-white">Lemon Squeezy</strong> المشفرة. نحن لا نطّلع على أي بيانات بطاقة ائتمانية.</p>
+<h3 class="text-emerald-400 font-bold text-base">4. حقوقك</h3>
+<p>تواصل معنا لحذف بياناتك: <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 underline">akashiiso04@gmail.com</a></p>`,
+    modal_terms_title: 'الشروط والأحكام وسياسة الاسترجاع',
+    modal_terms_body: `<p><strong class="text-white">آخر تحديث:</strong> يناير 2026</p>
+<h3 class="text-emerald-400 font-bold text-base">1. طبيعة الخدمة</h3>
+<p>AI Inspector أداة تحليل بصري آلية. <strong class="text-white">التقارير استرشادية وغير ملزمة قانونياً.</strong></p>
+<h3 class="text-emerald-400 font-bold text-base">2. سياسة الاسترجاع</h3>
+<p>لا يُسمح بالاسترداد بعد استهلاك الفحوصات. في حالات الأعطال التقنية يتم منح رصيد تعويضي.</p>
+<p>للمطالبة: <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 underline">akashiiso04@gmail.com</a> خلال 7 أيام.</p>
+<h3 class="text-emerald-400 font-bold text-base">3. باقة VIP والتجديد</h3>
+<p>باقة VIP تتجدد شهرياً آلياً. عند إلغاء الاشتراك يُلغى الرصيد المترحل فوراً.</p>`,
+    modal_contact_title: 'التواصل والدعم الفني',
+    modal_contact_text: 'اضغط على الزر أدناه ليتم تحويلك لتطبيق البريد وسنرد خلال 24 ساعة.',
+    modal_contact_btn: '✉️ إرسال رسالة عبر البريد الإلكتروني',
+    err_email_required: 'يرجى إدخال بريدك الإلكتروني',
+    err_image_required: 'يرجى اختيار صورة واحدة على الأقل',
+    err_secret_required: 'الرمز السري مطلوب للمتابعة.',
+    err_connection: 'خطأ في الاتصال، تحقق من الشبكة وحاول مجدداً',
+    err_unexpected: 'استجابة غير متوقعة من الخادم.',
+    err_polling: 'فقد الاتصال أثناء انتظار النتيجة.',
+    err_no_credits: 'نفد رصيدك. اشترِ باقة للاستمرار.',
+    err_404: 'حدث خطأ 404: الخادم أو الرابط غير موجود.',
+    err_no_report: 'لا يوجد تقرير لتحميله بعد.',
+    err_popups: 'يرجى السماح بالنوافذ المنبثقة لتحميل التقرير PDF.',
+    secret_prompt: '🔒 هذا الحساب محمي.\nيرجى إدخال الرمز السري للمتابعة:',
+    secret_prompt2: (msg) => `🔒 ${msg}\nيرجى إدخال الرمز السري:`,
+    err_wrong_secret: 'الرمز السري غير صحيح أو أنك لا تملك صلاحية الوصول.',
+    cost_preview_exempt: (n) => `${n} صورة — الفحص مجاني (حساب استثنائي) 🎁`,
+    cost_preview: (n, cost) => `${n} صورة → سيُخصم ${cost} فحص من رصيدك`,
+    photo_limit_exempt: 'الحد الأقصى: 4 صور (حساب استثنائي)',
+    photo_limit_default: 'الحد الأقصى: 1 صورة',
+    photo_limit_n: (n) => `الحد الأقصى: ${n} صور`,
+    credits_exempt: (plan) => `حساب استثنائي — فحوصات غير محدودة (باقة: ${plan}) 🎁`,
+    credits_info: (credits, plan) => `رصيدك الحالي: ${credits} فحص (باقة: ${plan})`,
+    credits_remaining: (credits, cost) => `الرصيد المتبقي: ${credits} فحص (خُصم ${cost} فحص)`,
+    photo_limit_exceeded: (limit) => `باقتك تسمح بـ ${limit} صورة كحد أقصى.`,
+    no_account_data: 'لا توجد بيانات سابقة لهذا الحساب.',
+    admin_account: '⚡ حساب مسؤول / استثنائي: فحوصات غير محدودة',
+    pdf_report_title: 'تقرير فحص المنتج', pdf_product_label: 'المنتج / الوصف',
+    pdf_footer_text: 'هذا التقرير صادر من نظام AI Inspector على editchecker.com — تحليل استرشادي آلي غير ملزم قانونياً',
+    plan_exempt_label: 'مفتوح / استثناء',
+  },
+  en: {
+    nav_pricing: 'Pricing', nav_faq: 'FAQ', nav_support: 'Support',
+    nav_plans_btn: 'Plans & Pricing',
+    hero_badge: '🚀 Powered by the latest AI models for image inspection',
+    hero_h1_1: 'Discover the Smallest Defects in Products',
+    hero_h1_2: 'with Expert Precision in Seconds',
+    hero_p: 'Upload product photos with a short description, and our system will deliver a professional diagnostic report instantly.',
+    form_title: '🔍 Inspect Your Product Now',
+    form_email_label: 'Your Email', form_email_ph: 'example@gmail.com',
+    form_desc_label: 'Product Description (optional)', form_desc_ph: 'e.g., iPhone 13 Black, no cracks',
+    form_images_label: 'Product Photos', form_required: '*',
+    form_photo_limit_default: 'Max: 1 photo',
+    form_logo_label: 'Your Store / Showroom Logo',
+    form_logo_note: '(optional — appears in PDF report)',
+    form_logo_hint: 'This logo will appear at the top of the inspection report',
+    form_btn: 'Inspect Now →',
+    btn_uploading: 'Uploading...', btn_analyzing: 'Analyzing...',
+    btn_processing: 'Processing (may take a moment)...',
+    pdf_btn: '📄 Download PDF Report',
+    hiw_title: 'How Does It Work?', hiw_sub: '3 simple steps, instant professional report',
+    hiw_1_title: 'Upload Photos', hiw_1_desc: 'Upload product photos from different angles for a more comprehensive and accurate analysis (based on your plan).',
+    hiw_2_title: 'Visual AI Analysis', hiw_2_desc: 'The system scans photos for scratches, damage, and any discrepancies with the seller\'s description.',
+    hiw_3_title: 'Instant Report', hiw_3_desc: 'Within seconds, receive a detailed report showing the product\'s condition and final recommendation.',
+    why_badge: '⚠️ Before You Pay — Read This',
+    why_title: 'How Many Times Have You Bought Something and Regretted It?',
+    why_sub: 'Sellers know how to photograph products at angles that hide everything. You can\'t see beyond the photo — but AI can.',
+    why_1_title: 'The Phone "No Scratches"', why_1_desc: 'Paid SAR 1,800 for an iPhone in "excellent condition", and after delivery discovered an internal screen crack and a burned battery.', why_1_tag: 'A loss you could have avoided with one inspection',
+    why_2_title: 'The Car "No Accidents"', why_2_desc: 'The listing said "fully loaded, no accidents". After purchase, an inspector revealed a repainted door — a carefully hidden accident.', why_2_tag: "The camera doesn't lie — AI reveals all",
+    why_3_title: 'The Watch "100% Authentic"', why_3_desc: '$600 watch, logo misspelled by half a millimeter, leather breaking in the first week.', why_3_tag: "Smart counterfeiting can't fool AI",
+    stat_1_val: '68%', stat_1_label: 'of used-item buyers discover defects they didn\'t know about',
+    stat_2_val: '15s', stat_2_label: 'is all it takes for a full AI inspection',
+    stat_3_val: '+40', stat_3_label: 'inspection points analyzed in every photo automatically',
+    stat_4_val: '$14.99', stat_4_label: 'only to protect your purchases for life',
+    pricing_title: 'Plans & Pricing', pricing_sub: 'Invest a small amount now to avoid losing thousands later',
+    free_name: 'Free Trial', free_tagline: 'Try for free', free_price: 'Free',
+    free_f1: '✓ 3 free inspections', free_f2: '✓ <strong>1 photo</strong> per inspection',
+    free_f3: '✓ Instant reports & defect detection', free_f4: '✓ Download PDF report', free_btn: 'Start Free',
+    basic_name: 'Basic', basic_tagline: 'For occasional buyers', basic_badge: 'Credits never expire',
+    basic_f1: '✓ 10 high-quality inspections', basic_f2: '✓ <strong>1 photo</strong> per inspection',
+    basic_f3: '✓ Scratch analysis & description comparison', basic_f4: '✓ Download PDF report', basic_f5: '✓ Valid for life', basic_btn: 'Buy Now',
+    pro_hot: '🔥 Best Seller', pro_name: 'Advanced (Pro)', pro_tagline: 'For frequent used-item shoppers', pro_badge: 'Credits never expire',
+    pro_f1: '✓ 50 detailed inspections', pro_f2: '✓ Upload up to <strong>2 photos</strong>',
+    pro_f3: '✓ Hidden defect detection', pro_f4: '✓ Download PDF report', pro_f5: '✓ Valid for life', pro_btn: 'Buy Now',
+    vip_name: 'Business (VIP)', vip_tagline: 'For dealerships & inspection offices', vip_period: '/mo', vip_renew: 'Auto-renews monthly',
+    vip_f1: '✓ 120 inspections/month', vip_f2: '✓ <strong>Credit rollover</strong> (up to 200)',
+    vip_f3: '✓ Upload up to <strong>4 photos</strong>', vip_f4: '✓ <strong>White-Label:</strong> your logo on PDF',
+    vip_f5: '✓ <strong>🎁 +30 inspections</strong> after 3 months', vip_f6: '✓ Maximum processing priority ⚡', vip_btn: 'Subscribe Now',
+    faq_title: 'Frequently Asked Questions', faq_sub: 'Everything you need to know about inspection and credits',
+    faq_1_q: 'Can I upload more than one photo?', faq_1_a: 'Yes. The Pro plan allows up to 2 photos, and the VIP plan allows up to 4 photos of the same product from different angles.',
+    faq_2_q: 'How does the credit and rollover system work?', faq_2_a: 'Basic and Pro plan credits never expire. The VIP plan renews monthly with remaining credits rolled over (up to 200) while the subscription is active. Credits are cancelled upon cancellation.',
+    faq_3_q: 'How are multiple photo costs calculated?', faq_3_a: '1 photo = 1 credit. 2 photos = 1 credit. 3 photos = 2 credits. 4 photos = 2 credits. Half the number of photos is deducted, minimum 1 credit.',
+    faq_4_q: 'What is the White-Label & store logo feature?', faq_4_a: 'VIP subscribers can upload their showroom logo to appear at the top of every PDF report they generate, giving reports their brand identity.',
+    faq_5_q: 'What is the VIP loyalty reward?', faq_5_a: 'After 3 consecutive months of active subscription, 30 free inspections are automatically granted as an appreciation gift.',
+    faq_6_q: 'Is the report a final binding decision?', faq_6_a: 'No. AI Inspector reports are an automated visual advisory tool. The final decision is always yours.',
+    disclaimer_title: '⚠️ Disclaimer',
+    disclaimer_text: '"AI Inspector" reports are an auxiliary advisory tool based on automated visual analysis and are not considered a comprehensive mechanical or legal inspection.',
+    footer_rights: '© 2026 All rights reserved — editchecker.com',
+    footer_contact_label: 'Contact & Technical Support:', footer_privacy: 'Privacy Policy',
+    footer_terms: 'Terms, Conditions & Refund Policy', footer_support: 'Contact & Support',
+    modal_privacy_title: 'Privacy Policy',
+    modal_privacy_body: `<p><strong class="text-white">Last updated:</strong> January 2026</p>
+<h3 class="text-emerald-400 font-bold text-base">1. Data We Collect</h3>
+<ul class="list-disc list-inside space-y-1 pl-4"><li>Email address — to track inspection credits.</li><li>Uploaded product photo — for automated analysis only.</li><li>Product description (optional) — to enhance analysis accuracy.</li></ul>
+<h3 class="text-emerald-400 font-bold text-base">2. How We Use Your Data</h3>
+<p>Product photos are used exclusively to generate the automated inspection report. <strong class="text-white">Photos are automatically deleted upon completion of processing.</strong></p>
+<h3 class="text-emerald-400 font-bold text-base">3. Electronic Payments</h3>
+<p>Payments are processed through the encrypted <strong class="text-white">Lemon Squeezy</strong> platform. We do not access any credit card data.</p>
+<h3 class="text-emerald-400 font-bold text-base">4. Your Rights</h3>
+<p>Contact us to delete your data: <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 underline">akashiiso04@gmail.com</a></p>`,
+    modal_terms_title: 'Terms, Conditions & Refund Policy',
+    modal_terms_body: `<p><strong class="text-white">Last updated:</strong> January 2026</p>
+<h3 class="text-emerald-400 font-bold text-base">1. Nature of Service</h3>
+<p>AI Inspector is an automated visual analysis tool. <strong class="text-white">Reports are advisory and not legally binding.</strong></p>
+<h3 class="text-emerald-400 font-bold text-base">2. Refund Policy</h3>
+<p>Refunds are not permitted after inspections have been consumed. In cases of technical failures, compensatory credits are granted.</p>
+<p>To claim: <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 underline">akashiiso04@gmail.com</a> within 7 days.</p>
+<h3 class="text-emerald-400 font-bold text-base">3. VIP Plan & Renewal</h3>
+<p>The VIP plan renews automatically monthly. Upon cancellation, rolled-over credits are immediately cancelled.</p>`,
+    modal_contact_title: 'Contact & Technical Support',
+    modal_contact_text: 'Click the button below to be redirected to your email app. We respond within 24 hours.',
+    modal_contact_btn: '✉️ Send Email',
+    err_email_required: 'Please enter your email address',
+    err_image_required: 'Please select at least one photo',
+    err_secret_required: 'Secret code is required to continue.',
+    err_connection: 'Connection error, check your network and try again',
+    err_unexpected: 'Unexpected server response.',
+    err_polling: 'Connection lost while waiting for result.',
+    err_no_credits: "You've run out of credits. Buy a plan to continue.",
+    err_404: 'Error 404: Server or endpoint not found.',
+    err_no_report: 'No report available to download.',
+    err_popups: 'Please allow pop-ups to download the PDF report.',
+    secret_prompt: '🔒 This account is protected.\nPlease enter the secret code to continue:',
+    secret_prompt2: (msg) => `🔒 ${msg}\nPlease enter the secret code:`,
+    err_wrong_secret: 'Invalid secret code or you do not have access.',
+    cost_preview_exempt: (n) => `${n} photo${n>1?'s':''} — Free (exempt account) 🎁`,
+    cost_preview: (n, cost) => `${n} photo${n>1?'s':''} → ${cost} credit${cost>1?'s':''} will be deducted`,
+    photo_limit_exempt: 'Max: 4 photos (exempt account)',
+    photo_limit_default: 'Max: 1 photo',
+    photo_limit_n: (n) => `Max: ${n} photos`,
+    credits_exempt: (plan) => `Exempt account — Unlimited inspections (plan: ${plan}) 🎁`,
+    credits_info: (credits, plan) => `Your balance: ${credits} inspection${credits>1?'s':''} (plan: ${plan})`,
+    credits_remaining: (credits, cost) => `Remaining: ${credits} inspection${credits>1?'s':''} (${cost} deducted)`,
+    photo_limit_exceeded: (limit) => `Your plan allows a maximum of ${limit} photo${limit>1?'s':''}.`,
+    no_account_data: 'No previous account data found.',
+    admin_account: '⚡ Admin / Exempt account: Unlimited inspections',
+    pdf_report_title: 'Product Inspection Report', pdf_product_label: 'Product / Description',
+    pdf_footer_text: 'This report was generated by AI Inspector at editchecker.com — Automated advisory analysis, not legally binding',
+    plan_exempt_label: 'Open / Exempt',
+  }
+};
 
-<!-- Privacy Modal -->
+let currentLang = 'ar';
+
+function t(key, ...args) {
+  const val = T[currentLang][key];
+  if (typeof val === 'function') return val(...args);
+  return val !== undefined ? val : (T['ar'][key] || key);
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('ai_inspector_lang', lang);
+  const root = document.getElementById('html-root');
+  root.lang = lang;
+  root.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  applyTranslations();
+  updateLangButtons();
+}
+
+function updateLangButtons() {
+  const btnAr = document.getElementById('btn-lang-ar');
+  const btnEn = document.getElementById('btn-lang-en');
+  if (!btnAr || !btnEn) return;
+  btnAr.className = 'px-2.5 py-1 rounded text-xs font-bold transition-all ' + (currentLang==='ar' ? 'lang-btn-active' : 'lang-btn-inactive');
+  btnEn.className = 'px-2.5 py-1 rounded text-xs font-bold transition-all ' + (currentLang==='en' ? 'lang-btn-active' : 'lang-btn-inactive');
+}
+
+function applyTranslations() {
+  // data-i18n simple text
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const val = t(key);
+    if (typeof val === 'string') el.textContent = val;
+  });
+  // data-i18n-html
+  document.querySelectorAll('[data-i18n-html]').forEach(el => {
+    const key = el.getAttribute('data-i18n-html');
+    const val = t(key);
+    if (typeof val === 'string') el.innerHTML = val;
+  });
+  // placeholders
+  document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+    const key = el.getAttribute('data-i18n-ph');
+    el.placeholder = t(key);
+  });
+  // Dynamic sections
+  renderPricing();
+  renderFAQ();
+  // Photo limit
+  const limitMsg = document.getElementById('photo-limit-msg');
+  if (limitMsg) {
+    if (isExempt) limitMsg.textContent = t('photo_limit_exempt');
+    else limitMsg.textContent = t('photo_limit_default');
+  }
+  // update cost preview if visible
+  updateCostPreview();
+}
+</script>
+
+<!-- ════════════════════════════════════════════ MODALS -->
 <div id="modal-privacy" class="modal-backdrop" onclick="closeModal('modal-privacy')">
   <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto p-8 text-right" onclick="event.stopPropagation()">
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-bold text-white">سياسة الخصوصية</h2>
+      <h2 class="text-xl font-bold text-white" data-i18n="modal_privacy_title">سياسة الخصوصية</h2>
       <button onclick="closeModal('modal-privacy')" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
     </div>
-    <div class="text-slate-300 text-sm leading-relaxed space-y-5">
-      <p><strong class="text-white">آخر تحديث:</strong> يناير 2026</p>
-      <h3 class="text-emerald-400 font-bold text-base">1. البيانات التي نجمعها</h3>
-      <ul class="list-disc list-inside space-y-1 pr-4">
-        <li>عنوان البريد الإلكتروني — لتتبع رصيد الفحوصات.</li>
-        <li>صورة المنتج المرفوعة — لإجراء التحليل الآلي فقط.</li>
-        <li>وصف المنتج (اختياري) — لتعزيز دقة التحليل.</li>
-      </ul>
-      <h3 class="text-emerald-400 font-bold text-base">2. كيف نستخدم بياناتك</h3>
-      <p>تُستخدم صورة المنتج حصرياً لتوليد تقرير الفحص الآلي. <strong class="text-white">يتم حذف الصورة تلقائياً فور اكتمال المعالجة.</strong></p>
-      <h3 class="text-emerald-400 font-bold text-base">3. الدفع الإلكتروني</h3>
-      <p>تتم عمليات الدفع عبر منصة <strong class="text-white">Lemon Squeezy</strong> المشفرة. نحن لا نطّلع على أي بيانات بطاقة ائتمانية.</p>
-      <h3 class="text-emerald-400 font-bold text-base">4. حقوقك</h3>
-      <p>تواصل معنا لحذف بياناتك: <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 underline">akashiiso04@gmail.com</a></p>
-    </div>
+    <div id="modal-privacy-body" class="text-slate-300 text-sm leading-relaxed space-y-5" data-i18n-html="modal_privacy_body"></div>
   </div>
 </div>
 
-<!-- Terms Modal -->
 <div id="modal-terms" class="modal-backdrop" onclick="closeModal('modal-terms')">
   <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto p-8 text-right" onclick="event.stopPropagation()">
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-bold text-white">الشروط والأحكام وسياسة الاسترجاع</h2>
+      <h2 class="text-xl font-bold text-white" data-i18n="modal_terms_title">الشروط والأحكام وسياسة الاسترجاع</h2>
       <button onclick="closeModal('modal-terms')" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
     </div>
-    <div class="text-slate-300 text-sm leading-relaxed space-y-5">
-      <p><strong class="text-white">آخر تحديث:</strong> يناير 2026</p>
-      <h3 class="text-emerald-400 font-bold text-base">1. طبيعة الخدمة</h3>
-      <p>AI Inspector أداة تحليل بصري آلية. <strong class="text-white">التقارير استرشادية وغير ملزمة قانونياً.</strong></p>
-      <h3 class="text-emerald-400 font-bold text-base">2. سياسة الاسترجاع</h3>
-      <p>لا يُسمح بالاسترداد بعد استهلاك الفحوصات. في حالات الأعطال التقنية يتم منح رصيد تعويضي.</p>
-      <p>للمطالبة: <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 underline">akashiiso04@gmail.com</a> خلال 7 أيام.</p>
-      <h3 class="text-emerald-400 font-bold text-base">3. باقة VIP والتجديد</h3>
-      <p>باقة VIP تتجدد شهرياً آلياً. عند إلغاء الاشتراك يُلغى الرصيد المترحل فوراً.</p>
-    </div>
+    <div id="modal-terms-body" class="text-slate-300 text-sm leading-relaxed space-y-5" data-i18n-html="modal_terms_body"></div>
   </div>
 </div>
 
-<!-- Contact Modal -->
 <div id="modal-contact" class="modal-backdrop" onclick="closeModal('modal-contact')">
   <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full mx-4 p-8 text-right" onclick="event.stopPropagation()">
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-bold text-white">التواصل والدعم الفني</h2>
+      <h2 class="text-xl font-bold text-white" data-i18n="modal_contact_title">التواصل والدعم الفني</h2>
       <button onclick="closeModal('modal-contact')" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
     </div>
-    <p class="text-slate-400 text-sm mb-8">اضغط على الزر أدناه ليتم تحويلك لتطبيق البريد وسنرد خلال 24 ساعة.</p>
-    <a href="mailto:akashiiso04@gmail.com?subject=دعم%20فني%20-%20AI%20Inspector"
-       class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-4 rounded-xl text-sm transition-all flex justify-center items-center gap-2">
-      <span class="text-xl">✉️</span> إرسال رسالة عبر البريد الإلكتروني
-    </a>
+    <p class="text-slate-400 text-sm mb-8" data-i18n="modal_contact_text">اضغط على الزر أدناه ليتم تحويلك لتطبيق البريد وسنرد خلال 24 ساعة.</p>
+    <a href="mailto:akashiiso04@gmail.com?subject=Support - AI Inspector"
+       class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-4 rounded-xl text-sm transition-all flex justify-center items-center gap-2"
+       data-i18n="modal_contact_btn">✉️ إرسال رسالة عبر البريد الإلكتروني</a>
     <p class="text-slate-500 text-xs text-center mt-4">akashiiso04@gmail.com</p>
   </div>
 </div>
@@ -135,12 +384,19 @@
       <img src="/static/logo.png" alt="AI Inspector" class="w-10 h-10 rounded-xl object-cover shadow-lg shadow-emerald-500/20">
       <span class="font-extrabold text-xl bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">AI Inspector</span>
     </div>
-    <div class="hidden sm:flex items-center gap-6 text-sm text-slate-400">
-      <a href="#pricing" class="hover:text-white transition-colors">الأسعار</a>
-      <a href="#faq" class="hover:text-white transition-colors">الأسئلة الشائعة</a>
-      <button onclick="openModal('modal-contact')" class="hover:text-white transition-colors">الدعم الفني</button>
+    <div class="hidden sm:flex items-center gap-5 text-sm text-slate-400">
+      <a href="#pricing" class="hover:text-white transition-colors" data-i18n="nav_pricing">الأسعار</a>
+      <a href="#faq" class="hover:text-white transition-colors" data-i18n="nav_faq">الأسئلة الشائعة</a>
+      <button onclick="openModal('modal-contact')" class="hover:text-white transition-colors" data-i18n="nav_support">الدعم الفني</button>
     </div>
-    <a href="#pricing" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition-all">الباقات والأسعار</a>
+    <div class="flex items-center gap-2">
+      <!-- Language Toggle -->
+      <div class="flex items-center gap-0.5 bg-slate-800/80 border border-slate-700/60 rounded-lg p-0.5">
+        <button id="btn-lang-ar" onclick="setLang('ar')" class="px-2.5 py-1 rounded text-xs font-bold transition-all lang-btn-active">عربي</button>
+        <button id="btn-lang-en" onclick="setLang('en')" class="px-2.5 py-1 rounded text-xs font-bold transition-all lang-btn-inactive">EN</button>
+      </div>
+      <a href="#pricing" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm transition-all" data-i18n="nav_plans_btn">الباقات والأسعار</a>
+    </div>
   </div>
 </nav>
 
@@ -149,71 +405,74 @@
   <div class="absolute inset-0 -z-10 flex items-center justify-center">
     <div class="w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-3xl"></div>
   </div>
-  <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-6">
+  <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-6" data-i18n="hero_badge">
     🚀 مدعوم بأحدث نماذج الذكاء الاصطناعي لفحص الصور
   </span>
   <h1 class="text-4xl sm:text-6xl font-extrabold text-white leading-tight max-w-4xl mx-auto mb-6">
-    اكتشف أدق العيوب في المنتجات
-    <span class="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">بدقة الخبراء وفي ثوانٍ</span>
+    <span data-i18n="hero_h1_1">اكتشف أدق العيوب في المنتجات</span>
+    <br>
+    <span class="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent" data-i18n="hero_h1_2">بدقة الخبراء وفي ثوانٍ</span>
   </h1>
-  <p class="text-lg text-slate-400 max-w-2xl mx-auto mb-10">
+  <p class="text-lg text-slate-400 max-w-2xl mx-auto mb-10" data-i18n="hero_p">
     ارفع صور المنتج مع وصف قصير، وسيرسل نظامنا تقريراً تشخيصياً احترافياً فورياً.
   </p>
 
   <!-- Upload Form -->
-  <div class="max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 text-right shadow-xl">
-    <h3 class="text-lg font-bold text-white mb-4">🔍 افحص منتجك الآن</h3>
+  <div class="max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-6 text-right form-box shadow-xl">
+    <h3 class="text-lg font-bold text-white mb-4" data-i18n="form_title">🔍 افحص منتجك الآن</h3>
 
     <!-- Email -->
     <div class="mb-3">
-      <label class="text-sm text-slate-400 block mb-1">بريدك الإلكتروني <span class="text-emerald-400">*</span></label>
-      <input id="upload-email" type="email" placeholder="example@gmail.com"
+      <label class="text-sm text-slate-400 block mb-1 form-label">
+        <span data-i18n="form_email_label">بريدك الإلكتروني</span>
+        <span class="text-emerald-400"> *</span>
+      </label>
+      <input id="upload-email" type="email" data-i18n-ph="form_email_ph" placeholder="example@gmail.com"
              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
     </div>
 
     <!-- Description -->
     <div class="mb-3">
-      <label class="text-sm text-slate-400 block mb-1">وصف المنتج (اختياري)</label>
-      <input id="upload-desc" type="text" placeholder="مثال: آيفون 13 أسود بدون كسر"
+      <label class="text-sm text-slate-400 block mb-1 form-label" data-i18n="form_desc_label">وصف المنتج (اختياري)</label>
+      <input id="upload-desc" type="text" data-i18n-ph="form_desc_ph" placeholder="مثال: آيفون 13 أسود بدون كسر"
              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
     </div>
 
     <!-- Product images -->
     <div class="mb-3">
       <div class="flex justify-between items-end mb-1">
-        <label class="text-sm text-slate-400">صور المنتج <span class="text-emerald-400">*</span></label>
-        <span id="photo-limit-msg" class="text-xs text-slate-500">الحد الأقصى: 1 صورة</span>
+        <label class="text-sm text-slate-400 form-label">
+          <span data-i18n="form_images_label">صور المنتج</span>
+          <span class="text-emerald-400"> *</span>
+        </label>
+        <span id="photo-limit-msg" class="text-xs text-slate-500" data-i18n="form_photo_limit_default">الحد الأقصى: 1 صورة</span>
       </div>
       <input id="upload-image" type="file" accept="image/*" multiple
              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-emerald-500 file:text-slate-950 cursor-pointer"
              onchange="onImagesSelected(this)">
-
-      <!-- Image preview thumbnails -->
       <div id="image-previews" class="flex flex-wrap gap-2 mt-2"></div>
-
-      <!-- Cost preview -->
       <div id="cost-preview" class="hidden mt-2 text-xs font-semibold text-emerald-400"></div>
     </div>
 
-    <!-- Custom logo (optional, VIP/Pro) -->
+    <!-- Custom logo -->
     <div id="custom-logo-section" class="mb-4 hidden">
-      <label class="text-sm text-slate-400 block mb-1">
-        شعار متجرك / معرضك
-        <span class="text-xs text-amber-400 mr-1">(اختياري — يظهر في تقرير PDF)</span>
+      <label class="text-sm text-slate-400 block mb-1 form-label">
+        <span data-i18n="form_logo_label">شعار متجرك / معرضك</span>
+        <span class="text-xs text-amber-400 mx-1" data-i18n="form_logo_note">(اختياري — يظهر في تقرير PDF)</span>
       </label>
       <input id="upload-logo" type="file" accept="image/*"
              class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-amber-500 file:text-slate-950 cursor-pointer"
              onchange="onLogoSelected(this)">
       <div id="logo-preview-wrap" class="hidden mt-2 flex items-center gap-2">
-        <img id="logo-preview-img" src="" alt="شعار" class="h-10 object-contain rounded border border-slate-600">
-        <span class="text-xs text-slate-400">سيظهر هذا الشعار في أعلى تقرير الفحص</span>
+        <img id="logo-preview-img" src="" alt="logo" class="h-10 object-contain rounded border border-slate-600">
+        <span class="text-xs text-slate-400" data-i18n="form_logo_hint">سيظهر هذا الشعار في أعلى تقرير الفحص</span>
       </div>
     </div>
 
     <!-- Submit -->
     <button id="upload-btn" onclick="submitUpload()"
             class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2">
-      <span id="btn-text">فحص الصورة الآن ←</span>
+      <span id="btn-text" data-i18n="form_btn">فحص الصورة الآن ←</span>
       <svg id="btn-spinner" class="hidden animate-spin h-4 w-4 text-slate-950" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
@@ -227,9 +486,8 @@
   <div id="result-area" class="hidden max-w-lg mx-auto mt-6"></div>
   <div id="pdf-area" class="hidden max-w-lg mx-auto mt-4">
     <button onclick="downloadPDF()"
-            class="w-full flex items-center justify-center gap-2 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-semibold py-2.5 rounded-xl text-sm transition-all">
-      📄 تحميل التقرير PDF
-    </button>
+            class="w-full flex items-center justify-center gap-2 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 font-semibold py-2.5 rounded-xl text-sm transition-all"
+            data-i18n="pdf_btn">📄 تحميل التقرير PDF</button>
   </div>
 </section>
 
@@ -237,24 +495,24 @@
 <section class="py-20 bg-slate-900/50 border-y border-slate-800">
   <div class="max-w-7xl mx-auto px-4">
     <div class="text-center mb-12">
-      <h2 class="text-3xl font-bold text-white mb-4">كيف يعمل النظام؟</h2>
-      <p class="text-slate-400">3 خطوات بسيطة، تقرير احترافي فوري</p>
+      <h2 class="text-3xl font-bold text-white mb-4" data-i18n="hiw_title">كيف يعمل النظام؟</h2>
+      <p class="text-slate-400" data-i18n="hiw_sub">3 خطوات بسيطة، تقرير احترافي فوري</p>
     </div>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
       <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800">
         <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">1</div>
-        <h3 class="text-xl font-bold text-white mb-3">ارفع الصور</h3>
-        <p class="text-slate-400 text-sm leading-relaxed">ارفع صور المنتج من زوايا مختلفة للحصول على تحليل أشمل وأدق (حسب باقتك).</p>
+        <h3 class="text-xl font-bold text-white mb-3" data-i18n="hiw_1_title">ارفع الصور</h3>
+        <p class="text-slate-400 text-sm leading-relaxed" data-i18n="hiw_1_desc">ارفع صور المنتج من زوايا مختلفة للحصول على تحليل أشمل وأدق (حسب باقتك).</p>
       </div>
       <div class="bg-slate-900 p-8 rounded-2xl border border-emerald-500/30 shadow-lg shadow-emerald-500/10">
         <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">2</div>
-        <h3 class="text-xl font-bold text-white mb-3">تحليل بصري دقيق</h3>
-        <p class="text-slate-400 text-sm leading-relaxed">يمسح النظام الصور بحثاً عن الخدوش والتلفيات وأي تعارض مع وصف البائع.</p>
+        <h3 class="text-xl font-bold text-white mb-3" data-i18n="hiw_2_title">تحليل بصري دقيق</h3>
+        <p class="text-slate-400 text-sm leading-relaxed" data-i18n="hiw_2_desc">يمسح النظام الصور بحثاً عن الخدوش والتلفيات وأي تعارض مع وصف البائع.</p>
       </div>
       <div class="bg-slate-900 p-8 rounded-2xl border border-slate-800">
         <div class="w-12 h-12 bg-emerald-500/10 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-6 border border-emerald-500/20">3</div>
-        <h3 class="text-xl font-bold text-white mb-3">تقرير فوري</h3>
-        <p class="text-slate-400 text-sm leading-relaxed">خلال ثوانٍ تستلم تقريراً تفصيلياً باللغة العربية يوضح حالة المنتج والتوصية النهائية.</p>
+        <h3 class="text-xl font-bold text-white mb-3" data-i18n="hiw_3_title">تقرير فوري</h3>
+        <p class="text-slate-400 text-sm leading-relaxed" data-i18n="hiw_3_desc">خلال ثوانٍ تستلم تقريراً تفصيلياً باللغة العربية يوضح حالة المنتج والتوصية النهائية.</p>
       </div>
     </div>
   </div>
@@ -263,39 +521,39 @@
 <!-- ════════════════════════════════════════════ WHY YOU NEED THIS -->
 <section class="py-20 max-w-7xl mx-auto px-4">
   <div class="text-center mb-14">
-    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold mb-4">⚠️ قبل ما تدفع — اقرأ هذا</span>
-    <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-4">كم مرة اشتريت شيء وندمت؟</h2>
-    <p class="text-slate-400 max-w-2xl mx-auto">البائعون يعرفون كيف يصورون المنتج بزاوية تخفي كل شيء. أنت لا ترى ما وراء الصورة — لكن الذكاء الاصطناعي يرى.</p>
+    <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold mb-4" data-i18n="why_badge">⚠️ قبل ما تدفع — اقرأ هذا</span>
+    <h2 class="text-3xl sm:text-4xl font-extrabold text-white mb-4" data-i18n="why_title">كم مرة اشتريت شيء وندمت؟</h2>
+    <p class="text-slate-400 max-w-2xl mx-auto" data-i18n="why_sub">البائعون يعرفون كيف يصورون المنتج بزاوية تخفي كل شيء. أنت لا ترى ما وراء الصورة — لكن الذكاء الاصطناعي يرى.</p>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
     <div class="bg-slate-900 border border-red-900/40 rounded-2xl p-6 relative overflow-hidden">
       <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-8 translate-x-8"></div>
       <div class="text-4xl mb-4">📱</div>
-      <h3 class="text-white font-bold text-lg mb-2">الجوال "بدون خدش"</h3>
-      <p class="text-slate-400 text-sm leading-relaxed">دفعت 1,800 ريال على آيفون "بحالة ممتازة"، وبعد التسليم اكتشفت كسراً في الشاشة من الداخل وبطارية محترقة.</p>
-      <div class="mt-4 text-red-400 text-xs font-semibold">خسارة مكنت تتفاداها بـ فحص واحد</div>
+      <h3 class="text-white font-bold text-lg mb-2" data-i18n="why_1_title">الجوال "بدون خدش"</h3>
+      <p class="text-slate-400 text-sm leading-relaxed" data-i18n="why_1_desc">دفعت 1,800 ريال على آيفون "بحالة ممتازة"، وبعد التسليم اكتشفت كسراً في الشاشة من الداخل وبطارية محترقة.</p>
+      <div class="mt-4 text-red-400 text-xs font-semibold" data-i18n="why_1_tag">خسارة مكنت تتفاداها بـ فحص واحد</div>
     </div>
     <div class="bg-slate-900 border border-red-900/40 rounded-2xl p-6 relative overflow-hidden">
       <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-8 translate-x-8"></div>
       <div class="text-4xl mb-4">🚗</div>
-      <h3 class="text-white font-bold text-lg mb-2">السيارة "بدون حوادث"</h3>
-      <p class="text-slate-400 text-sm leading-relaxed">الإعلان قال "فل كامل بدون حوادث". بعد الشراء كشف الفاحص إعادة طلاء في الباب — حادث طُمس بعناية.</p>
-      <div class="mt-4 text-red-400 text-xs font-semibold">الكاميرا لا تكذب — الذكاء الاصطناعي يكشف</div>
+      <h3 class="text-white font-bold text-lg mb-2" data-i18n="why_2_title">السيارة "بدون حوادث"</h3>
+      <p class="text-slate-400 text-sm leading-relaxed" data-i18n="why_2_desc">الإعلان قال "فل كامل بدون حوادث". بعد الشراء كشف الفاحص إعادة طلاء في الباب — حادث طُمس بعناية.</p>
+      <div class="mt-4 text-red-400 text-xs font-semibold" data-i18n="why_2_tag">الكاميرا لا تكذب — الذكاء الاصطناعي يكشف</div>
     </div>
     <div class="bg-slate-900 border border-red-900/40 rounded-2xl p-6 relative overflow-hidden">
       <div class="absolute top-0 right-0 w-32 h-32 bg-red-500/5 rounded-full -translate-y-8 translate-x-8"></div>
       <div class="text-4xl mb-4">⌚</div>
-      <h3 class="text-white font-bold text-lg mb-2">الساعة "الأصلية 100%"</h3>
-      <p class="text-slate-400 text-sm leading-relaxed">ساعة بـ 600 دولار، الشعار مكتوب غلط بفرق نص ميليمتر، والجلد ينكسر من أول أسبوع.</p>
-      <div class="mt-4 text-red-400 text-xs font-semibold">التزوير الذكي لا يخدع الذكاء الاصطناعي</div>
+      <h3 class="text-white font-bold text-lg mb-2" data-i18n="why_3_title">الساعة "الأصلية 100%"</h3>
+      <p class="text-slate-400 text-sm leading-relaxed" data-i18n="why_3_desc">ساعة بـ 600 دولار، الشعار مكتوب غلط بفرق نص ميليمتر، والجلد ينكسر من أول أسبوع.</p>
+      <div class="mt-4 text-red-400 text-xs font-semibold" data-i18n="why_3_tag">التزوير الذكي لا يخدع الذكاء الاصطناعي</div>
     </div>
   </div>
   <div class="bg-gradient-to-r from-slate-900 via-emerald-950/30 to-slate-900 border border-emerald-900/30 rounded-2xl p-8">
     <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1">68%</div><div class="text-xs text-slate-400">من مشتري المستعمل يكتشفون عيوباً لم يعلموا بها</div></div>
-      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1">15 ث</div><div class="text-xs text-slate-400">فقط وقت الفحص الكامل بالذكاء الاصطناعي</div></div>
-      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1">+40</div><div class="text-xs text-slate-400">نقطة فحص تُحلَّل في كل صورة تلقائياً</div></div>
-      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1">$14.99</div><div class="text-xs text-slate-400">فقط مقابل حماية مشترياتك مدى الحياة</div></div>
+      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1" data-i18n="stat_1_val">68%</div><div class="text-xs text-slate-400" data-i18n="stat_1_label">من مشتري المستعمل يكتشفون عيوباً لم يعلموا بها</div></div>
+      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1" data-i18n="stat_2_val">15 ث</div><div class="text-xs text-slate-400" data-i18n="stat_2_label">فقط وقت الفحص الكامل بالذكاء الاصطناعي</div></div>
+      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1" data-i18n="stat_3_val">+40</div><div class="text-xs text-slate-400" data-i18n="stat_3_label">نقطة فحص تُحلَّل في كل صورة تلقائياً</div></div>
+      <div><div class="text-3xl font-extrabold text-emerald-400 mb-1" data-i18n="stat_4_val">$14.99</div><div class="text-xs text-slate-400" data-i18n="stat_4_label">فقط مقابل حماية مشترياتك مدى الحياة</div></div>
     </div>
   </div>
 </section>
@@ -303,158 +561,28 @@
 <!-- ════════════════════════════════════════════ PRICING -->
 <section id="pricing" class="py-20 max-w-7xl mx-auto px-4">
   <div class="text-center mb-12">
-    <h2 class="text-3xl font-bold text-white mb-4">الباقات والأسعار</h2>
-    <p class="text-slate-400">استثمر مبلغاً بسيطاً الآن لتتجنب خسارة الآلاف لاحقاً</p>
+    <h2 class="text-3xl font-bold text-white mb-4" data-i18n="pricing_title">الباقات والأسعار</h2>
+    <p class="text-slate-400" data-i18n="pricing_sub">استثمر مبلغاً بسيطاً الآن لتتجنب خسارة الآلاف لاحقاً</p>
   </div>
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-
-    <!-- Free -->
-    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
-      <div>
-        <h3 class="text-lg font-bold text-white mb-1">التجريبية</h3>
-        <p class="text-xs text-slate-400 mb-4">اختبر مجاناً</p>
-        <div class="text-3xl font-extrabold text-white mb-6">مجاناً</div>
-        <ul class="space-y-2 text-sm text-slate-300 mb-8">
-          <li>✓ 3 فحوصات مجانية</li>
-          <li>✓ <strong>صورة واحدة</strong> لكل فحص</li>
-          <li>✓ تقارير فورية وكشف للعيوب</li>
-          <li>✓ تحميل PDF للتقرير</li>
-        </ul>
-      </div>
-      <button onclick="document.getElementById('upload-email').scrollIntoView({behavior:'smooth'})"
-              class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors">
-        ابدأ مجاناً
-      </button>
-    </div>
-
-    <!-- Basic -->
-    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
-      <div>
-        <h3 class="text-lg font-bold text-white mb-1">الأساسية</h3>
-        <p class="text-xs text-slate-400 mb-4">للمشتري العرضي</p>
-        <div class="text-3xl font-extrabold text-white mb-1">$4.99</div>
-        <p class="text-xs text-emerald-400 mb-6">رصيد لا ينتهي أبداً</p>
-        <ul class="space-y-2 text-sm text-slate-300 mb-8">
-          <li>✓ 10 فحوصات عالية الدقة</li>
-          <li>✓ <strong>صورة واحدة</strong> لكل فحص</li>
-          <li>✓ تحليل الخدوش ومقارنة الوصف</li>
-          <li>✓ تحميل PDF للتقرير</li>
-          <li>✓ صالح مدى الحياة</li>
-        </ul>
-      </div>
-      <a href="https://ainspector.lemonsqueezy.com/checkout/buy/e810b85b-5273-4da2-9477-f3cf62f9737d"
-         class="lemonsqueezy-button w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-center text-sm transition-colors block">
-        اشترِ الآن
-      </a>
-    </div>
-
-    <!-- Pro -->
-    <div class="bg-slate-900 rounded-2xl border-2 border-emerald-500/50 p-6 flex flex-col justify-between relative shadow-lg shadow-emerald-500/10">
-      <span class="absolute -top-3 right-6 bg-emerald-500 text-slate-950 text-[10px] font-bold px-3 py-1 rounded-full">🔥 الأكثر مبيعاً</span>
-      <div>
-        <h3 class="text-lg font-bold text-white mb-1">المتقدمة (Pro)</h3>
-        <p class="text-xs text-slate-400 mb-4">للمتردد على مواقع المستعمل</p>
-        <div class="text-3xl font-extrabold text-white mb-1">$14.99</div>
-        <p class="text-xs text-emerald-400 mb-6">رصيد لا ينتهي أبداً</p>
-        <ul class="space-y-2 text-sm text-slate-300 mb-8">
-          <li>✓ 50 فحصاً مفصلاً</li>
-          <li>✓ رفع حتى <strong>صورتين</strong> للمنتج</li>
-          <li>✓ كشف العيوب المخفية</li>
-          <li>✓ تحميل PDF للتقرير</li>
-          <li>✓ صالح مدى الحياة</li>
-        </ul>
-      </div>
-      <a href="https://ainspector.lemonsqueezy.com/checkout/buy/db680fa5-9ec4-4fed-81fe-0ad4928266c3"
-         class="lemonsqueezy-button w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-center text-sm transition-colors block">
-        اشترِ الآن
-      </a>
-    </div>
-
-    <!-- VIP -->
-    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
-      <div>
-        <h3 class="text-lg font-bold text-white mb-1">الأعمال (VIP)</h3>
-        <p class="text-xs text-slate-400 mb-4">للمعارض ومكاتب الفحص</p>
-        <div class="text-3xl font-extrabold text-white mb-1">$49.99<span class="text-sm font-normal text-slate-400">/شهر</span></div>
-        <p class="text-xs text-slate-400 mb-6">تجديد آلي شهرياً</p>
-        <ul class="space-y-2 text-sm text-slate-300 mb-8">
-          <li>✓ 120 فحصاً شهرياً</li>
-          <li>✓ <strong>ترحيل الرصيد</strong> (حتى 200 فحص)</li>
-          <li>✓ رفع حتى <strong>4 صور</strong> للمنتج</li>
-          <li>✓ <strong>White-Label:</strong> شعارك على PDF</li>
-          <li>✓ <strong>🎁 +30 فحص</strong> بعد 3 أشهر</li>
-          <li>✓ أولوية معالجة قصوى ⚡</li>
-        </ul>
-      </div>
-      <a href="https://ainspector.lemonsqueezy.com/checkout/buy/ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072"
-         class="lemonsqueezy-button w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-center text-sm transition-colors block">
-        اشترك الآن
-      </a>
-    </div>
-  </div>
+  <div id="pricing-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"></div>
 </section>
 
 <!-- ════════════════════════════════════════════ FAQ -->
 <section id="faq" class="py-20 bg-slate-900/50 border-y border-slate-800">
   <div class="max-w-4xl mx-auto px-4">
     <div class="text-center mb-12">
-      <h2 class="text-3xl font-bold text-white mb-4">الأسئلة الشائعة</h2>
-      <p class="text-slate-400">كل ما تحتاج معرفته عن طريقة الفحص والرصيد</p>
+      <h2 class="text-3xl font-bold text-white mb-4" data-i18n="faq_title">الأسئلة الشائعة</h2>
+      <p class="text-slate-400" data-i18n="faq_sub">كل ما تحتاج معرفته عن طريقة الفحص والرصيد</p>
     </div>
-    <div class="space-y-4">
-      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
-        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>هل يمكنني رفع أكثر من صورة؟</span>
-          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
-        </summary>
-        <p class="text-slate-400 text-sm leading-relaxed mt-3">نعم. باقة Pro تتيح رفع حتى صورتين، وباقة VIP تتيح حتى 4 صور لنفس المنتج من زوايا مختلفة.</p>
-      </details>
-      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
-        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>كيف يعمل نظام الرصيد وتدوير الفحوصات؟</span>
-          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
-        </summary>
-        <p class="text-slate-400 text-sm leading-relaxed mt-3">الباقات الأساسية وPro رصيدها لا ينتهي أبداً. باقة VIP تتجدد شهرياً مع ترحيل الرصيد المتبقي (حتى 200 فحص) طالما الاشتراك نشط. عند الإلغاء يُلغى الرصيد المترحل.</p>
-      </details>
-      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
-        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>كيف يتم احتساب تكلفة الصور المتعددة؟</span>
-          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
-        </summary>
-        <p class="text-slate-400 text-sm leading-relaxed mt-3">صورة واحدة = فحص واحد. صورتان = فحص واحد. 3 صور = فحصان. 4 صور = فحصان. يُخصم نصف عدد الصور بحد أدنى فحص واحد.</p>
-      </details>
-      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
-        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>ما هي ميزة White-Label وشعار المتجر؟</span>
-          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
-        </summary>
-        <p class="text-slate-400 text-sm leading-relaxed mt-3">مشتركو VIP يمكنهم رفع شعار معرضهم ليظهر في أعلى كل تقرير PDF يصدرونه، مما يجعل التقارير تحمل هوية علامتهم التجارية.</p>
-      </details>
-      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
-        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>ما هي مكافأة الاستمرارية لعملاء VIP؟</span>
-          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
-        </summary>
-        <p class="text-slate-400 text-sm leading-relaxed mt-3">بعد 3 أشهر متواصلة من الاشتراك النشط، يُمنح تلقائياً 30 فحصاً مجانياً كهدية تقديرية.</p>
-      </details>
-      <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
-        <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
-          <span>هل التقرير قرار نهائي ملزم؟</span>
-          <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
-        </summary>
-        <p class="text-slate-400 text-sm leading-relaxed mt-3">لا. تقرير AI Inspector أداة استشارية بصرية آلية. القرار النهائي يعود إليك دائماً.</p>
-      </details>
-    </div>
+    <div id="faq-container" class="space-y-4"></div>
   </div>
 </section>
 
 <!-- ════════════════════════════════════════════ DISCLAIMER -->
 <section class="max-w-7xl mx-auto px-4 mb-12 mt-12">
   <div class="bg-slate-900/40 border border-slate-800 rounded-xl p-6 text-center">
-    <h4 class="text-amber-500 font-bold mb-3">⚠️ تنويه وإخلاء مسؤولية</h4>
-    <p class="text-xs text-slate-400 leading-relaxed max-w-4xl mx-auto">
-      تقارير "AI Inspector" هي أداة استشارية مساعدة تعتمد على التحليل البصري الآلي، ولا تُعتبر فحصاً ميكانيكياً أو قانونياً شاملاً.
-    </p>
+    <h4 class="text-amber-500 font-bold mb-3" data-i18n="disclaimer_title">⚠️ تنويه وإخلاء مسؤولية</h4>
+    <p class="text-xs text-slate-400 leading-relaxed max-w-4xl mx-auto" data-i18n="disclaimer_text">تقارير "AI Inspector" هي أداة استشارية مساعدة تعتمد على التحليل البصري الآلي، ولا تُعتبر فحصاً ميكانيكياً أو قانونياً شاملاً.</p>
   </div>
 </section>
 
@@ -464,15 +592,15 @@
     <img src="/static/logo.png" alt="AI Inspector" class="w-12 h-12 rounded-xl object-cover opacity-80">
   </div>
   <p class="text-slate-400 font-semibold mb-1">AI Inspector</p>
-  <p class="text-slate-500 text-sm mb-4">© 2026 جميع الحقوق محفوظة لـ editchecker.com</p>
+  <p class="text-slate-500 text-sm mb-4" data-i18n="footer_rights">© 2026 جميع الحقوق محفوظة لـ editchecker.com</p>
   <p class="text-slate-400 text-sm mb-6">
-    للتواصل والدعم الفني:
-    <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 hover:underline font-semibold">akashiiso04@gmail.com</a>
+    <span data-i18n="footer_contact_label">للتواصل والدعم الفني:</span>
+    <a href="mailto:akashiiso04@gmail.com" class="text-emerald-400 hover:underline font-semibold mx-1">akashiiso04@gmail.com</a>
   </p>
   <div class="flex flex-wrap justify-center gap-6 text-xs text-slate-500">
-    <button onclick="openModal('modal-privacy')" class="hover:text-emerald-400 transition-colors underline underline-offset-2">سياسة الخصوصية</button>
-    <button onclick="openModal('modal-terms')" class="hover:text-emerald-400 transition-colors underline underline-offset-2">الشروط والأحكام وسياسة الاسترجاع</button>
-    <button onclick="openModal('modal-contact')" class="hover:text-emerald-400 transition-colors underline underline-offset-2">التواصل والدعم الفني</button>
+    <button onclick="openModal('modal-privacy')" class="hover:text-emerald-400 transition-colors underline underline-offset-2" data-i18n="footer_privacy">سياسة الخصوصية</button>
+    <button onclick="openModal('modal-terms')" class="hover:text-emerald-400 transition-colors underline underline-offset-2" data-i18n="footer_terms">الشروط والأحكام وسياسة الاسترجاع</button>
+    <button onclick="openModal('modal-contact')" class="hover:text-emerald-400 transition-colors underline underline-offset-2" data-i18n="footer_support">التواصل والدعم الفني</button>
   </div>
 </footer>
 
@@ -480,15 +608,87 @@
 <script>
 /* ════ State ════ */
 let currentPhotoLimit = 1;
-let isExempt          = false;
-let selectedFiles     = [];   // Array of File objects for product images
+let isExempt = false;
+let selectedFiles = [];
 
-// 🟢 الحل هنا: تعريف قائمة الإيميلات المحمية/المستثناة لتفادي خطأ undefined
-const PROTECTED_EMAILS = [
-  "akashiiso04@gmail.com",
-  "muhannadd0594@gmail.com",
-  "mohammdlghmd@gmail.com"
-];
+const PROTECTED_EMAILS = ["akashiiso04@gmail.com","muhannadd0594@gmail.com","mohammdlghmd@gmail.com"];
+
+/* ════ Render dynamic sections ════ */
+function renderPricing() {
+  const container = document.getElementById('pricing-cards');
+  if (!container) return;
+  container.innerHTML = `
+    <!-- Free -->
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
+      <div>
+        <h3 class="text-lg font-bold text-white mb-1">${t('free_name')}</h3>
+        <p class="text-xs text-slate-400 mb-4">${t('free_tagline')}</p>
+        <div class="text-3xl font-extrabold text-white mb-6">${t('free_price')}</div>
+        <ul class="space-y-2 text-sm text-slate-300 mb-8">
+          <li>${t('free_f1')}</li><li>${t('free_f2')}</li><li>${t('free_f3')}</li><li>${t('free_f4')}</li>
+        </ul>
+      </div>
+      <button onclick="document.getElementById('upload-email').scrollIntoView({behavior:'smooth'})"
+              class="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-sm transition-colors">${t('free_btn')}</button>
+    </div>
+    <!-- Basic -->
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
+      <div>
+        <h3 class="text-lg font-bold text-white mb-1">${t('basic_name')}</h3>
+        <p class="text-xs text-slate-400 mb-4">${t('basic_tagline')}</p>
+        <div class="text-3xl font-extrabold text-white mb-1">$4.99</div>
+        <p class="text-xs text-emerald-400 mb-6">${t('basic_badge')}</p>
+        <ul class="space-y-2 text-sm text-slate-300 mb-8">
+          <li>${t('basic_f1')}</li><li>${t('basic_f2')}</li><li>${t('basic_f3')}</li><li>${t('basic_f4')}</li><li>${t('basic_f5')}</li>
+        </ul>
+      </div>
+      <a href="https://ainspector.lemonsqueezy.com/checkout/buy/e810b85b-5273-4da2-9477-f3cf62f9737d"
+         class="lemonsqueezy-button w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-center text-sm transition-colors block">${t('basic_btn')}</a>
+    </div>
+    <!-- Pro -->
+    <div class="bg-slate-900 rounded-2xl border-2 border-emerald-500/50 p-6 flex flex-col justify-between relative shadow-lg shadow-emerald-500/10">
+      <span class="absolute -top-3 right-6 bg-emerald-500 text-slate-950 text-[10px] font-bold px-3 py-1 rounded-full">${t('pro_hot')}</span>
+      <div>
+        <h3 class="text-lg font-bold text-white mb-1">${t('pro_name')}</h3>
+        <p class="text-xs text-slate-400 mb-4">${t('pro_tagline')}</p>
+        <div class="text-3xl font-extrabold text-white mb-1">$14.99</div>
+        <p class="text-xs text-emerald-400 mb-6">${t('pro_badge')}</p>
+        <ul class="space-y-2 text-sm text-slate-300 mb-8">
+          <li>${t('pro_f1')}</li><li>${t('pro_f2')}</li><li>${t('pro_f3')}</li><li>${t('pro_f4')}</li><li>${t('pro_f5')}</li>
+        </ul>
+      </div>
+      <a href="https://ainspector.lemonsqueezy.com/checkout/buy/db680fa5-9ec4-4fed-81fe-0ad4928266c3"
+         class="lemonsqueezy-button w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-center text-sm transition-colors block">${t('pro_btn')}</a>
+    </div>
+    <!-- VIP -->
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col justify-between">
+      <div>
+        <h3 class="text-lg font-bold text-white mb-1">${t('vip_name')}</h3>
+        <p class="text-xs text-slate-400 mb-4">${t('vip_tagline')}</p>
+        <div class="text-3xl font-extrabold text-white mb-1">$49.99<span class="text-sm font-normal text-slate-400">${t('vip_period')}</span></div>
+        <p class="text-xs text-slate-400 mb-6">${t('vip_renew')}</p>
+        <ul class="space-y-2 text-sm text-slate-300 mb-8">
+          <li>${t('vip_f1')}</li><li>${t('vip_f2')}</li><li>${t('vip_f3')}</li><li>${t('vip_f4')}</li><li>${t('vip_f5')}</li><li>${t('vip_f6')}</li>
+        </ul>
+      </div>
+      <a href="https://ainspector.lemonsqueezy.com/checkout/buy/ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072"
+         class="lemonsqueezy-button w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-center text-sm transition-colors block">${t('vip_btn')}</a>
+    </div>`;
+}
+
+function renderFAQ() {
+  const container = document.getElementById('faq-container');
+  if (!container) return;
+  const faqs = [1,2,3,4,5,6].map(i => `
+    <details class="group bg-slate-900 border border-slate-800 rounded-xl p-5 open:border-emerald-500/40">
+      <summary class="flex items-center justify-between cursor-pointer text-white font-bold list-none">
+        <span>${t('faq_'+i+'_q')}</span>
+        <span class="text-emerald-400 text-xl group-open:rotate-45 transition-transform">+</span>
+      </summary>
+      <p class="text-slate-400 text-sm leading-relaxed mt-3">${t('faq_'+i+'_a')}</p>
+    </details>`).join('');
+  container.innerHTML = faqs;
+}
 
 /* ════ Modals ════ */
 function openModal(id)  { document.getElementById(id).classList.add('open');    document.body.style.overflow='hidden'; }
@@ -511,15 +711,14 @@ function calcCost(n) { return Math.max(1, Math.ceil(n / 2)); }
 
 function updateCostPreview() {
   const previewEl = document.getElementById('cost-preview');
+  if (!previewEl) return;
   const n = selectedFiles.length;
   if (n === 0) { previewEl.classList.add('hidden'); return; }
   if (isExempt) {
-    previewEl.textContent = `${n} صورة — الفحص مجاني (حساب استثنائي) 🎁`;
-    previewEl.classList.remove('hidden');
-    return;
+    previewEl.textContent = t('cost_preview_exempt', n);
+  } else {
+    previewEl.textContent = t('cost_preview', n, calcCost(n));
   }
-  const cost = calcCost(n);
-  previewEl.textContent = `${n} صورة → سيُخصم ${cost} فحص من رصيدك`;
   previewEl.classList.remove('hidden');
 }
 
@@ -530,18 +729,18 @@ document.getElementById('upload-email').addEventListener('input', function(e) {
   const logoSec = document.getElementById('custom-logo-section');
   const creditsInfo = document.getElementById('credits-info');
 
-  if (typeof PROTECTED_EMAILS !== 'undefined' && PROTECTED_EMAILS.includes(email)) {
+  if (PROTECTED_EMAILS.includes(email)) {
     isExempt = true;
     currentPhotoLimit = 4;
-    limitMsg.textContent = 'الحد الأقصى: 4 صور (حساب استثنائي)';
+    if (limitMsg) limitMsg.textContent = t('photo_limit_exempt');
     logoSec.classList.remove('hidden');
-    creditsInfo.textContent = '⚡ حساب مسؤول / استثنائي: فحوصات غير محدودة';
+    if (creditsInfo) creditsInfo.textContent = t('admin_account');
   } else {
     isExempt = false;
     currentPhotoLimit = 1;
-    limitMsg.textContent = 'الحد الأقصى: 1 صورة';
+    if (limitMsg) limitMsg.textContent = t('photo_limit_default');
     logoSec.classList.add('hidden');
-    creditsInfo.textContent = '';
+    if (creditsInfo) creditsInfo.textContent = '';
   }
   updateCostPreview();
 });
@@ -551,12 +750,10 @@ function renderPreviews() {
   const container = document.getElementById('image-previews');
   container.innerHTML = '';
   selectedFiles.forEach((file, idx) => {
-    const url  = URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
     const wrap = document.createElement('div');
     wrap.className = 'preview-thumb';
-    wrap.innerHTML = `
-      <img src="${url}" alt="صورة ${idx+1}">
-      <button type="button" class="remove-btn" onclick="removeImage(${idx})" title="حذف">×</button>`;
+    wrap.innerHTML = `<img src="${url}" alt="photo ${idx+1}"><button type="button" class="remove-btn" onclick="removeImage(${idx})" title="remove">×</button>`;
     container.appendChild(wrap);
   });
   updateCostPreview();
@@ -572,21 +769,16 @@ function removeImage(idx) {
 
 function onImagesSelected(input) {
   document.getElementById('upload-error').classList.add('hidden');
-  
   const newFiles = Array.from(input.files);
   let combinedFiles = selectedFiles.concat(newFiles);
-  
   if (combinedFiles.length > currentPhotoLimit) {
-    showError(`باقتك تسمح بـ ${currentPhotoLimit} صورة كحد أقصى.`);
+    showError(t('photo_limit_exceeded', currentPhotoLimit));
     combinedFiles = combinedFiles.slice(0, currentPhotoLimit);
   }
-  
   selectedFiles = combinedFiles;
-  
   const dt = new DataTransfer();
   selectedFiles.forEach(f => dt.items.add(f));
   input.files = dt.files;
-  
   renderPreviews();
 }
 
@@ -601,57 +793,46 @@ function onLogoSelected(input) {
 
 /* ════ Credits Check on Email Blur ════ */
 document.addEventListener('DOMContentLoaded', () => {
+  // Init language
+  const saved = localStorage.getItem('ai_inspector_lang');
+  const detected = (navigator.language || navigator.userLanguage || 'ar').startsWith('ar') ? 'ar' : 'en';
+  currentLang = saved || detected;
+  setLang(currentLang);
+
   document.getElementById('upload-email').addEventListener('blur', async function () {
     const email = this.value.trim();
     if (!email) return;
-    
     try {
       const r = await fetch(`/credits?email=${encodeURIComponent(email)}`);
-      
-      // معالجة مشكلة 404 (مثلاً: حساب غير موجود أو الرابط خاطئ)
       if (r.status === 404) {
-        console.warn('لم يتم العثور على بيانات الحساب (404). قد يكون مستخدماً جديداً.');
-        document.getElementById('credits-info').textContent = 'لا توجد بيانات سابقة لهذا الحساب.';
+        document.getElementById('credits-info').textContent = t('no_account_data');
         return;
       }
-
       if (!r.ok) throw new Error(`HTTP Error: ${r.status}`);
-      
       const d = await r.json();
+      if (d.error) return;
       if (d.credits !== undefined) {
-        let isExempt = d.is_exempt || false;
-        let currentPhotoLimit = d.photo_limit || 1;
-
-        const planLabel = d.plan === 'exempt' ? 'مفتوح / استثناء' : d.plan;
-        document.getElementById('credits-info').textContent =
-          isExempt
-            ? `حساب استثنائي — فحوصات غير محدودة (باقة: ${planLabel}) 🎁`
-            : `رصيدك الحالي: ${d.credits} فحص (باقة: ${planLabel})`;
-
-        // تحديث حقل رفع الصور بناءً على صلاحيات الباقة
+        isExempt = d.is_exempt || false;
+        currentPhotoLimit = d.photo_limit || 1;
+        const planLabel = d.plan === 'exempt' ? t('plan_exempt_label') : d.plan;
+        document.getElementById('credits-info').textContent = isExempt
+          ? t('credits_exempt', planLabel)
+          : t('credits_info', d.credits, planLabel);
         const fileInput = document.getElementById('upload-image');
-        const limitMsg  = document.getElementById('photo-limit-msg');
+        const limitMsg = document.getElementById('photo-limit-msg');
         if (currentPhotoLimit > 1) {
           fileInput.setAttribute('multiple', 'multiple');
-          limitMsg.textContent = `الحد الأقصى: ${currentPhotoLimit} صور`;
+          if (limitMsg) limitMsg.textContent = t('photo_limit_n', currentPhotoLimit);
         } else {
           fileInput.removeAttribute('multiple');
-          limitMsg.textContent = 'الحد الأقصى: 1 صورة';
+          if (limitMsg) limitMsg.textContent = t('photo_limit_default');
         }
-
-        // إظهار قسم الشعار المخصص لباقات VIP أو الاستثنائية
         const logoSection = document.getElementById('custom-logo-section');
-        if (d.plan === 'vip' || d.plan === 'exempt') {
-          logoSection.classList.remove('hidden');
-        } else {
-          logoSection.classList.add('hidden');
-        }
-
-        if (typeof updateCostPreview === 'function') updateCostPreview();
+        if (d.plan === 'vip' || d.plan === 'exempt') logoSection.classList.remove('hidden');
+        else logoSection.classList.add('hidden');
+        updateCostPreview();
       }
-    } catch (e) {
-      console.error('حدث خطأ أثناء جلب الرصيد:', e);
-    }
+    } catch (e) { console.error('Credits fetch error:', e); }
   });
 });
 
@@ -666,252 +847,180 @@ async function submitUpload() {
   const spinner = document.getElementById('btn-spinner');
   const btnText = document.getElementById('btn-text');
 
-  // دالة لإعادة الزر لحالته الطبيعية
   const resetBtnUI = () => {
     btn.disabled = false;
     spinner.classList.add('hidden');
-    btnText.textContent = 'فحص الصورة الآن ←';
+    btnText.textContent = t('form_btn');
   };
 
   const displayError = (msg) => {
-    if(typeof showError === 'function') showError(msg);
-    else { errEl.textContent = msg; errEl.classList.remove('hidden'); }
-    resetBtnUI(); // إيقاف التحميل عند وجود خطأ
+    showError(msg);
+    resetBtnUI();
   };
 
   errEl.classList.add('hidden');
   resEl.classList.add('hidden');
   pdfArea.classList.add('hidden');
 
-  if (!email) { displayError('يرجى إدخال بريدك الإلكتروني'); return; }
-  if (typeof selectedFiles === 'undefined' || selectedFiles.length === 0) { 
-    displayError('يرجى اختيار صورة واحدة على الأقل'); return; 
-  }
+  if (!email) { displayError(t('err_email_required')); return; }
+  if (!selectedFiles || selectedFiles.length === 0) { displayError(t('err_image_required')); return; }
 
   let userSecretCode = '';
-
-  // 1. التحقق المسبق في الفرونت إند من قائمة الإيميلات المحمية
-  if (typeof PROTECTED_EMAILS !== 'undefined' && PROTECTED_EMAILS.includes(email)) {
-    const entered = prompt('🔒 هذا الحساب محمي.\nيرجى إدخال الرمز السري للمتابعة:');
-    if (entered === null) return; // تم الإلغاء
-    if (entered.trim() === '') { displayError('الرمز السري مطلوب للمتابعة.'); return; }
+  if (PROTECTED_EMAILS.includes(email)) {
+    const entered = prompt(t('secret_prompt'));
+    if (entered === null) return;
+    if (entered.trim() === '') { displayError(t('err_secret_required')); return; }
     userSecretCode = entered.trim();
   }
 
   btn.disabled = true;
   spinner.classList.remove('hidden');
-  btnText.textContent = 'جاري الرفع...';
+  btnText.textContent = t('btn_uploading');
 
-  // دالة مساعدة لتجهيز وإرسال الطلب
   const sendRequest = async (secret) => {
     const form = new FormData();
     form.append('email', email);
     form.append('description', desc);
+    form.append('lang', currentLang);
     if (secret) form.append('secret_code', secret);
-
     selectedFiles.forEach(f => form.append('image', f));
-
     const logoInput = document.getElementById('upload-logo');
-    if (logoInput && logoInput.files.length > 0) {
-      form.append('custom_logo', logoInput.files[0]);
-    }
-
+    if (logoInput && logoInput.files.length > 0) form.append('custom_logo', logoInput.files[0]);
     return await fetch('/upload', { method: 'POST', body: form });
   };
 
   try {
     let resp = await sendRequest(userSecretCode);
-    
-    // 2. إذا رد السيرفر بـ 401 (يتطلب رمز سري)، نطلبه ونعيد الإرسال
+
     if (resp.status === 401) {
       const errorData = await resp.json();
-      const entered = prompt(`🔒 ${errorData.message || 'هذا الحساب محمي.'}\nيرجى إدخال الرمز السري:`);
+      const entered = prompt(t('secret_prompt2', errorData.message || ''));
       if (entered && entered.trim() !== '') {
         userSecretCode = entered.trim();
-        resp = await sendRequest(userSecretCode); 
-      } else {
-        displayError('الرمز السري مطلوب للمتابعة.');
-        return;
-      }
-    }
-    
-    // معالجة باقي الأخطاء
-    if (resp.status === 404) { displayError('حدث خطأ 404: الخادم أو الرابط غير موجود.'); return; }
-    if (resp.status === 403) {
-      const errorData = await resp.json();
-      displayError(errorData.message || 'الرمز السري غير صحيح أو أنك لا تملك صلاحية الوصول.');
-      return;
-    }
-    if (resp.status === 402) {
-      displayError('نفد رصيدك. اشترِ باقة للاستمرار.');
-      document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' });
-      return;
-    }
-    
-    const data = await resp.json();
-    if (!resp.ok || data.error) { 
-      displayError(data.message || data.error || 'حدث خطأ، حاول مرة أخرى'); 
-      return; 
+        resp = await sendRequest(userSecretCode);
+      } else { displayError(t('err_secret_required')); return; }
     }
 
-    // 3. التعديل الجديد (Polling)
+    if (resp.status === 404) { displayError(t('err_404')); return; }
+    if (resp.status === 403) {
+      const errorData = await resp.json();
+      displayError(errorData.message || t('err_wrong_secret')); return;
+    }
+    if (resp.status === 402) {
+      displayError(t('err_no_credits'));
+      document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' }); return;
+    }
+
+    const data = await resp.json();
+    if (!resp.ok || data.error) { displayError(data.message || data.error || t('err_connection')); return; }
+
     if (data.job_id) {
-        btnText.textContent = 'جاري التحليل...';
-        pollStatus(data.job_id); // نبدأ بفحص الحالة
+      btnText.textContent = t('btn_analyzing');
+      pollStatus(data.job_id);
     } else if (data.report) {
-        // كاحتياط إذا أرجع السيرفر التقرير مباشرة
-        handleSuccess(data);
+      handleSuccess(data);
     } else {
-        displayError('استجابة غير متوقعة من الخادم.');
+      displayError(t('err_unexpected'));
     }
 
   } catch (e) {
     console.error('Upload Error:', e);
-    displayError('خطأ في الاتصال، تحقق من الشبكة وحاول مجدداً');
+    displayError(t('err_connection'));
   }
 
-  // --- دوال مساعدة للتعامل مع الـ Polling والنجاح ---
-
-  // دالة الاستعلام الدوري (Polling)
   async function pollStatus(jobId) {
     try {
-        // إذا كان مسار السيرفر عندك يستخدم بارامتر، استبدل السطر التالي بـ: fetch(`/status?job_id=${jobId}`)
-        const res = await fetch(`/status/${jobId}`); 
-        const statusData = await res.json();
-
-        if (statusData.status === 'completed' || statusData.status === 'done') {
-            handleSuccess(statusData);
-        } else if (statusData.status === 'failed' || statusData.status === 'error') {
-            displayError(statusData.error || 'فشل في تحليل الملف');
-        } else {
-            // الحالة لا زالت "processing"
-            btnText.textContent = 'جاري المعالجة (قد يستغرق بعض الوقت)...';
-            setTimeout(() => pollStatus(jobId), 1500); // يفحص مرة أخرى بعد ثانية ونصف
-        }
+      const res = await fetch(`/status/${jobId}`);
+      const statusData = await res.json();
+      if (statusData.status === 'completed' || statusData.status === 'done') {
+        handleSuccess(statusData);
+      } else if (statusData.status === 'failed' || statusData.status === 'error') {
+        displayError(statusData.error || t('err_connection'));
+      } else {
+        btnText.textContent = t('btn_processing');
+        setTimeout(() => pollStatus(jobId), 1500);
+      }
     } catch (err) {
-        console.error('Polling Error:', err);
-        displayError('فقد الاتصال أثناء انتظار النتيجة.');
+      console.error('Polling Error:', err);
+      displayError(t('err_polling'));
     }
   }
 
-  // دالة معالجة النجاح وعرض التقرير
   function handleSuccess(resultData) {
-    /* حفظ البيانات وعرض التقرير */
-    window._lastReportHtml   = resultData.report;
-    window._lastDesc         = desc || 'تقرير فحص المنتج';
-    window._lastImagesB64    = resultData.images_b64 || [];
-    window._lastCustomLogo   = resultData.custom_logo_b64 || '';
-
+    window._lastReportHtml = resultData.report;
+    window._lastDesc = desc || t('pdf_report_title');
+    window._lastImagesB64 = resultData.images_b64 || [];
+    window._lastCustomLogo = resultData.custom_logo_b64 || '';
     resEl.innerHTML = resultData.report;
     resEl.classList.remove('hidden');
     pdfArea.classList.remove('hidden');
     resEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-    const planLabel = resultData.plan === 'exempt' ? 'مفتوح / استثناء' : (resultData.plan || '');
+    const planLabel = resultData.plan === 'exempt' ? t('plan_exempt_label') : (resultData.plan || '');
     const creditsInfo = document.getElementById('credits-info');
     if (creditsInfo) {
       creditsInfo.textContent = resultData.is_exempt
-        ? `حساب استثنائي — فحوصات غير محدودة (باقة: ${planLabel}) 🎁`
-        : `الرصيد المتبقي: ${resultData.credits} فحص (خُصم ${resultData.cost} فحص)`;
+        ? t('credits_exempt', planLabel)
+        : t('credits_remaining', resultData.credits, resultData.cost);
     }
-    
-    // إنهاء حالة التحميل للزر
     resetBtnUI();
   }
 }
-  
+
 /* ════ PDF Generator ════ */
 function downloadPDF() {
-  if (!window._lastReportHtml) { alert('لا يوجد تقرير لتحميله بعد.'); return; }
+  if (!window._lastReportHtml) { alert(t('err_no_report')); return; }
+  const desc = window._lastDesc || t('pdf_report_title');
+  const date = new Date().toLocaleDateString(currentLang === 'ar' ? 'ar-SA' : 'en-US', { year:'numeric', month:'long', day:'numeric' });
 
-  const desc = window._lastDesc || 'تقرير فحص المنتج';
-  const date = new Date().toLocaleDateString('ar-SA', { year:'numeric', month:'long', day:'numeric' });
-
-  /* إعادة تنسيق الألوان للطباعة */
   const tmp = document.createElement('div');
   tmp.innerHTML = window._lastReportHtml;
-  
   tmp.querySelectorAll('*').forEach(el => {
     if (el.style) {
-      const bg = el.style.backgroundColor;
-      const col = el.style.color;
-
+      const bg = el.style.backgroundColor; const col = el.style.color;
       if (bg === 'rgb(15, 23, 42)' || bg === '#0f172a') el.style.backgroundColor = '#f8fafc';
       else if (bg === 'rgb(30, 41, 59)' || bg === '#1e293b') el.style.backgroundColor = '#f1f5f9';
       else if (bg === 'rgb(24, 34, 52)' || bg === '#182234') el.style.backgroundColor = '#f1f5f9';
       else if (bg === 'rgba(17, 46, 35, 1)') el.style.backgroundColor = '#ecfdf5';
       else if (bg === 'rgb(51, 65, 85)' || bg === '#334155') el.style.backgroundColor = '#e2e8f0';
-
       if (col === 'rgb(248, 250, 252)' || col === '#f8fafc') el.style.color = '#0f172a';
       else if (col === 'rgb(226, 232, 240)' || col === '#e2e8f0') el.style.color = '#1e293b';
       else if (col === 'rgb(203, 213, 225)' || col === '#cbd5e1') el.style.color = '#334155';
       else if (col === 'rgb(148, 163, 184)' || col === '#94a3b8') el.style.color = '#475569';
       else if (col === 'rgb(100, 116, 139)' || col === '#64748b') el.style.color = '#475569';
-
       el.style.boxShadow = 'none';
     }
   });
 
   const reportBody = tmp.innerHTML;
   const siteLogo = window.location.origin + '/static/logo.png';
-
   const printHTML = `<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<title>تقرير فحص المنتج — AI Inspector</title>
+<html lang="${currentLang}" dir="${currentLang==='ar'?'rtl':'ltr'}">
+<head><meta charset="UTF-8"><title>${t('pdf_report_title')} — AI Inspector</title>
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Tajawal','Segoe UI',Arial,sans-serif;background:#fff;color:#0f172a;direction:rtl;
-     -webkit-print-color-adjust:exact;print-color-adjust:exact;}
-.pdf-header{background:#0f172a;color:#fff;padding:18px 24px;display:flex;align-items:center;
-            justify-content:space-between;border-radius:0 0 12px 12px;margin-bottom:20px;}
-.pdf-header .brand{display:flex;align-items:center;gap:12px;}
-.pdf-header .brand img{width:48px;height:48px;border-radius:10px;object-fit:cover;}
-.pdf-header .brand-name{font-size:22px;font-weight:800;color:#34d399;}
-.pdf-header .brand-url{font-size:11px;color:#94a3b8;margin-top:2px;}
-.pdf-header .meta{text-align:left;}
-.pdf-header .meta .report-label{font-size:13px;color:#94a3b8;}
-.pdf-header .meta .report-date{font-size:12px;color:#cbd5e1;margin-top:3px;}
-.pdf-product{background:#f1f5f9;border-right:4px solid #34d399;padding:10px 16px;
-             margin:0 0 20px;border-radius:0 8px 8px 0;font-size:13px;}
-.pdf-product .label{color:#64748b;font-size:11px;margin-bottom:3px;}
-.pdf-product .value{color:#0f172a;font-weight:700;font-size:14px;}
-.pdf-body{padding:0 4px;}
-.pdf-body *{font-family:'Tajawal','Segoe UI',Arial,sans-serif!important;}
-.pdf-footer{margin-top:24px;border-top:1px solid #e2e8f0;padding-top:12px;
-            text-align:center;font-size:10px;color:#94a3b8;}
-.pdf-body img{border:1px solid #e2e8f0!important;}
-@page{size:A4 portrait;margin:12mm 14mm;}
-@media print{body{background:#fff!important;}
-  .pdf-header{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
-</style>
-</head>
+<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Tajawal','Segoe UI',Arial,sans-serif;background:#fff;color:#0f172a;direction:${currentLang==='ar'?'rtl':'ltr'};-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.pdf-header{background:#0f172a;color:#fff;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;border-radius:0 0 12px 12px;margin-bottom:20px;}
+.pdf-header .brand{display:flex;align-items:center;gap:12px;}.pdf-header .brand img{width:48px;height:48px;border-radius:10px;object-fit:cover;}
+.pdf-header .brand-name{font-size:22px;font-weight:800;color:#34d399;}.pdf-header .brand-url{font-size:11px;color:#94a3b8;margin-top:2px;}
+.pdf-header .meta{text-align:${currentLang==='ar'?'left':'right'};}.pdf-header .meta .report-label{font-size:13px;color:#94a3b8;}.pdf-header .meta .report-date{font-size:12px;color:#cbd5e1;margin-top:3px;}
+.pdf-product{background:#f1f5f9;border-${currentLang==='ar'?'right':'left'}:4px solid #34d399;padding:10px 16px;margin:0 0 20px;border-radius:0 8px 8px 0;font-size:13px;}
+.pdf-product .label{color:#64748b;font-size:11px;margin-bottom:3px;}.pdf-product .value{color:#0f172a;font-weight:700;font-size:14px;}
+.pdf-body{padding:0 4px;}.pdf-body *{font-family:'Tajawal','Segoe UI',Arial,sans-serif!important;}
+.pdf-footer{margin-top:24px;border-top:1px solid #e2e8f0;padding-top:12px;text-align:center;font-size:10px;color:#94a3b8;}
+@page{size:A4 portrait;margin:12mm 14mm;}</style></head>
 <body>
 <div class="pdf-header">
-  <div class="brand">
-    <img src="${siteLogo}" alt="AI Inspector Logo" onerror="this.style.display='none'">
-    <div><div class="brand-name">AI Inspector</div><div class="brand-url">editchecker.com</div></div>
-  </div>
-  <div class="meta">
-    <div class="report-label">تقرير فحص المنتج</div>
-    <div class="report-date">${date}</div>
-  </div>
+  <div class="brand"><img src="${siteLogo}" alt="AI Inspector Logo" onerror="this.style.display='none'">
+  <div><div class="brand-name">AI Inspector</div><div class="brand-url">editchecker.com</div></div></div>
+  <div class="meta"><div class="report-label">${t('pdf_report_title')}</div><div class="report-date">${date}</div></div>
 </div>
-<div class="pdf-product">
-  <div class="label">المنتج / الوصف</div>
-  <div class="value">${desc}</div>
-</div>
+<div class="pdf-product"><div class="label">${t('pdf_product_label')}</div><div class="value">${desc}</div></div>
 <div class="pdf-body">${reportBody}</div>
-<div class="pdf-footer">
-  هذا التقرير صادر من نظام AI Inspector على editchecker.com — تحليل استرشادي آلي غير ملزم قانونياً
-</div>
+<div class="pdf-footer">${t('pdf_footer_text')}</div>
 <script>document.fonts.ready.then(()=>{setTimeout(()=>{window.print();},600);});<\/script>
 </body></html>`;
 
   const win = window.open('', '_blank', 'width=800,height=900');
-  if (!win) { alert('يرجى السماح بالنوافذ المنبثقة لتحميل التقرير PDF.'); return; }
+  if (!win) { alert(t('err_popups')); return; }
   win.document.open();
   win.document.write(printHTML);
   win.document.close();
