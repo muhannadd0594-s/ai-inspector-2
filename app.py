@@ -59,9 +59,9 @@ EXEMPT_EMAILS = {
 }
 
 PLAN_CREDITS = {
-    "e810b85b-5273-4da2-9477-f3cf62f9737d": ("basic", 10),
-    "db680fa5-9ec4-4fed-81fe-0ad4928266c3": ("pro",   50),
-    "ceff30c8-9ba9-4c2a-bfb8-0cd520a9c072": ("vip",  120),
+    "2085775": ("basic", 10),
+    "2085797": ("pro",   50),
+    "2085801": ("vip",  120),
 }
 
 PHOTO_LIMIT_MAP = {"free": 1, "basic": 1, "pro": 2, "vip": 4, "exempt": 4}
