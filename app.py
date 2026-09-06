@@ -706,7 +706,7 @@ def direct_upload():
     if num_images > photo_lim:
         return jsonify({"error": f"Your plan allows a maximum of {photo_lim} photo(s)"}), 400
 
-    cost = max(1, math.ceil(num_images / 2))
+    cost = num_images
 
     if not is_exempt(email_addr) and user["credits"] < cost:
         return jsonify({"error": "Insufficient credits", "credits": user["credits"]}), 402
