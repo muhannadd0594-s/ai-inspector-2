@@ -11,6 +11,7 @@ import uuid
 import time
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template, send_from_directory, send_file, Response
+from flask_cors import CORS
 import requests
 import psycopg2
 import psycopg2.extras
