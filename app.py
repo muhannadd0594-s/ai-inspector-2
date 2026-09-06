@@ -668,13 +668,18 @@ def credits_check():
         return jsonify({"error": "email required"}), 400
     if is_temp_email(email_addr):
         return jsonify({"error": "Temporary emails are not allowed."}), 400
-    user = get_or_create_user(email_addr)
-    return jsonify({
-        "credits":     user["credits"],
-        "plan":        user["plan"],
-        "photo_limit": PHOTO_LIMIT_MAP.get(user["plan"], 1),
-        "is_exempt":   is_exempt(email_addr),
-    })
+    
+    try:
+        user = get_or_create_user(email_addr)
+        return jsonify({
+            "credits":     user["credits"],
+            "plan":        user["plan"],
+            "photo_limit": PHOTO_LIMIT_MAP.get(user["plan"], 1),
+            "is_exempt":   is_exempt(email_addr),
+        })
+    except Exception as e:
+        log.exception("Credits check failed")
+        return jsonify({"debug_error": str(e), "database_url_set": bool(DATABASE_URL)}), 200
 
 
 @app.route("/upload", methods=["POST"])
