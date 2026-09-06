@@ -28,6 +28,9 @@ app = Flask(
     static_folder=os.path.join(_ROOT, "static"),
     static_url_path="/static",
 )
+
+CORS(app) # أضف هذا السطر هنا لتفعيل مرور البيانات
+
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
