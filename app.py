@@ -154,6 +154,18 @@ def init_db():
                 credits_after_grant INTEGER,
                 refund_status TEXT DEFAULT 'none',
                 created_at TIMESTAMP DEFAULT NOW())""")
+
+            # إصلاح: إضافة الأعمدة الناقصة إذا كان الجدول قديماً
+            for col, definition in [
+                ("credits",    "INTEGER DEFAULT 0"),
+                ("plan",       "TEXT DEFAULT 'free'"),
+                ("updated_at", "TEXT"),
+            ]:
+                try:
+                    cur.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {definition}")
+                except Exception as alter_err:
+                    log.warning("ALTER TABLE users.%s skipped: %s", col, alter_err)
+
         conn.commit()
 
 try:
