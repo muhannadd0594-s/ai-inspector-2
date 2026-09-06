@@ -170,6 +170,11 @@ def init_db():
                 created_at TIMESTAMP DEFAULT NOW())""")
         conn.commit()
 
+try:
+    init_db()
+except Exception as _e:
+    log.error("DB init error: %s", _e)
+
 # ─── Routes (home) ───────────────────────────────────────────────────────────
 @app.route('/')
 def home():
@@ -787,19 +792,19 @@ def lemonsqueezy_webhook():
             return jsonify({"error": "no email"}), 400
 
         if event_name == "order_created":
-    order_id = str(payload.get("data", {}).get("id", ""))
-    variant_id = None
-    for item in payload.get("included", []):
-        if item.get("type") == "order-items":
-            variant_id = str(item.get("attributes", {}).get("variant_id", "")).strip()
-            break
-    plan_info = PLAN_CREDITS.get(variant_id)
-    if not plan_info:
-        return jsonify({"status": "unknown_plan"}), 200
-    plan_name, credits = plan_info
-    add_credits(customer_email, plan_name, credits, order_id=order_id)
-    log.info("Granted %d credits (%s) to %s [order %s]", credits, plan_name, customer_email, order_id)
-    return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
+            order_id = str(payload.get("data", {}).get("id", ""))
+            variant_id = None
+            for item in payload.get("included", []):
+                if item.get("type") == "order-items":
+                    variant_id = str(item.get("attributes", {}).get("variant_id", "")).strip()
+                    break
+            plan_info = PLAN_CREDITS.get(variant_id)
+            if not plan_info:
+                return jsonify({"status": "unknown_plan"}), 200
+            plan_name, credits = plan_info
+            add_credits(customer_email, plan_name, credits, order_id=order_id)
+            log.info("Granted %d credits (%s) to %s [order %s]", credits, plan_name, customer_email, order_id)
+            return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
 
         elif event_name in ("subscription_created", "subscription_payment_success"):
             add_vip_credits(customer_email)
