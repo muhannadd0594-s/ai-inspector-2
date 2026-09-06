@@ -118,6 +118,7 @@ const T = {
     faq_4_q: 'ما هي ميزة White-Label وشعار المتجر؟', faq_4_a: 'مشتركو VIP يمكنهم رفع شعار معرضهم ليظهر في أعلى كل تقرير PDF يصدرونه، مما يجعل التقارير تحمل هوية علامتهم التجارية.',
     faq_5_q: 'ما هي مكافأة الاستمرارية لعملاء VIP؟', faq_5_a: 'بعد 3 أشهر متواصلة من الاشتراك النشط، يُمنح تلقائياً 30 فحصاً مجانياً كهدية تقديرية.',
     faq_6_q: 'هل التقرير قرار نهائي ملزم؟', faq_6_a: 'لا. تقرير AI Inspector أداة استشارية بصرية آلية. القرار النهائي يعود إليك دائماً.',
+    faq_7_q: 'كيف أسترد مبلغ الاشتراك؟', faq_7_a: 'يمكنك طلب استرداد كامل إذا لم تستخدم أي فحص من باقتك. اضغط على "طلب استرداد المبلغ" في أسفل الصفحة وأدخل إيميلك ورقم الطلب — سيتم التحقق والاسترداد تلقائياً.',
     disclaimer_title: '⚠️ تنويه وإخلاء مسؤولية',
     disclaimer_text: 'تقارير "AI Inspector" هي أداة استشارية مساعدة تعتمد على التحليل البصري الآلي، ولا تُعتبر فحصاً ميكانيكياً أو قانونياً شاملاً.',
     footer_rights: '© 2026 جميع الحقوق محفوظة لـ editchecker.com',
@@ -223,10 +224,10 @@ const T = {
     faq_title: 'Frequently Asked Questions', faq_sub: 'Everything you need to know about inspection and credits',
     faq_1_q: 'Can I upload more than one photo?', faq_1_a: 'Yes. The Pro plan allows up to 2 photos, and the VIP plan allows up to 4 photos of the same product from different angles.',
     faq_2_q: 'How does the credit and rollover system work?', faq_2_a: 'Basic and Pro plan credits never expire. The VIP plan renews monthly with remaining credits rolled over (up to 200) while the subscription is active. Credits are cancelled upon cancellation.',
-    faq_3_q: 'How are multiple photo costs calculated?', faq_3_a: '1 photo = 1 credit. 2 photos = 1 credit. 3 photos = 2 credits. 4 photos = 2 credits. Half the number of photos is deducted, minimum 1 credit.',
-    faq_4_q: 'What is the White-Label & store logo feature?', faq_4_a: 'VIP subscribers can upload their showroom logo to appear at the top of every PDF report they generate, giving reports their brand identity.',
-    faq_5_q: 'What is the VIP loyalty reward?', faq_5_a: 'After 3 consecutive months of active subscription, 30 free inspections are automatically granted as an appreciation gift.',
-    faq_6_q: 'Is the report a final binding decision?', faq_6_a: 'No. AI Inspector reports are an automated visual advisory tool. The final decision is always yours.',
+    faq_3_q: 'What is the White-Label & store logo feature?', faq_4_a: 'VIP subscribers can upload their showroom logo to appear at the top of every PDF report they generate, giving reports their brand identity.',
+    faq_4_q: 'What is the VIP loyalty reward?', faq_5_a: 'After 3 consecutive months of active subscription, 30 free inspections are automatically granted as an appreciation gift.',
+    faq_5_q: 'Is the report a final binding decision?', faq_6_a: 'No. AI Inspector reports are an automated visual advisory tool. The final decision is always yours.',
+    faq_6_q: 'How do I get a refund?', faq_7_a: 'You can request a full refund if you have not used any inspection from your plan. Click "Request Refund" at the bottom of the page, enter your email and order number — verification and refund happen automatically.',
     disclaimer_title: '⚠️ Disclaimer',
     disclaimer_text: '"AI Inspector" reports are an auxiliary advisory tool based on automated visual analysis and are not considered a comprehensive mechanical or legal inspection.',
     footer_rights: '© 2026 All rights reserved — editchecker.com',
@@ -377,6 +378,31 @@ function applyTranslations() {
   </div>
 </div>
 
+  <!-- Refund Modal -->
+<div id="modal-refund" class="modal-backdrop" onclick="closeModal('modal-refund')">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full mx-4 p-8 text-right" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-xl font-bold text-white">طلب استرداد المبلغ</h2>
+      <button onclick="closeModal('modal-refund')" class="text-slate-400 hover:text-white text-2xl leading-none">×</button>
+    </div>
+    <p class="text-slate-400 text-xs mb-5 leading-relaxed">
+      يمكنك استرداد المبلغ كاملاً إذا لم تستخدم أي فحص من باقتك. الاسترداد يتم تلقائياً خلال 5-10 أيام عمل.
+    </p>
+    <div class="space-y-3">
+      <input id="refund-email" type="email" placeholder="بريدك الإلكتروني"
+             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+      <input id="refund-order" type="text" placeholder="رقم الطلب (Order ID من إيميل LemonSqueezy)"
+             class="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+    </div>
+    <div id="refund-msg" class="hidden mt-4 p-3 rounded-lg text-sm text-center"></div>
+    <button onclick="checkRefund()"
+            class="w-full mt-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 rounded-xl text-sm transition-all">
+      التحقق من الأهلية
+    </button>
+    <p class="text-slate-600 text-xs text-center mt-3">رقم الطلب موجود في إيميل تأكيد الشراء من LemonSqueezy</p>
+  </div>
+</div>
+  
 <!-- ════════════════════════════════════════════ NAVBAR -->
 <nav class="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md fixed top-0 w-full z-50">
   <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -601,6 +627,7 @@ function applyTranslations() {
     <button onclick="openModal('modal-privacy')" class="hover:text-emerald-400 transition-colors underline underline-offset-2" data-i18n="footer_privacy">سياسة الخصوصية</button>
     <button onclick="openModal('modal-terms')" class="hover:text-emerald-400 transition-colors underline underline-offset-2" data-i18n="footer_terms">الشروط والأحكام وسياسة الاسترجاع</button>
     <button onclick="openModal('modal-contact')" class="hover:text-emerald-400 transition-colors underline underline-offset-2" data-i18n="footer_support">التواصل والدعم الفني</button>
+    <button onclick="openModal('modal-refund')" class="hover:text-emerald-400 transition-colors underline underline-offset-2">💰 طلب استرداد المبلغ</button>
   </div>
 </footer>
 
@@ -969,6 +996,46 @@ async function submitUpload() {
         : t('credits_remaining', resultData.credits, resultData.cost);
     }
     resetBtnUI();
+  }
+}
+
+  async function checkRefund() {
+  const email   = document.getElementById('refund-email').value.trim().toLowerCase();
+  const orderId = document.getElementById('refund-order').value.trim();
+  const msgEl   = document.getElementById('refund-msg');
+
+  if (!email || !orderId) {
+    msgEl.className = 'mt-4 p-3 rounded-lg text-sm text-center bg-red-900/30 border border-red-700 text-red-400';
+    msgEl.textContent = 'يرجى إدخال الإيميل ورقم الطلب';
+    msgEl.classList.remove('hidden');
+    return;
+  }
+
+  msgEl.className = 'mt-4 p-3 rounded-lg text-sm text-center bg-slate-800 text-slate-400';
+  msgEl.textContent = 'جاري التحقق...';
+  msgEl.classList.remove('hidden');
+
+  try {
+    const resp = await fetch('/refund', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, order_id: orderId })
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      msgEl.className = 'mt-4 p-3 rounded-lg text-sm text-center bg-emerald-900/30 border border-emerald-700 text-emerald-400';
+      msgEl.textContent = '✅ تم تقديم طلب الاسترداد بنجاح. سيصلك المبلغ خلال 5-10 أيام عمل.';
+    } else if (data.eligible === false) {
+      msgEl.className = 'mt-4 p-3 rounded-lg text-sm text-center bg-red-900/30 border border-red-700 text-red-400';
+      msgEl.textContent = `❌ غير مستحق للاسترداد — ${data.reason || 'استُخدمت فحوصات من هذه الباقة'}`;
+    } else {
+      msgEl.className = 'mt-4 p-3 rounded-lg text-sm text-center bg-red-900/30 border border-red-700 text-red-400';
+      msgEl.textContent = data.error || 'حدث خطأ، حاول مجدداً';
+    }
+  } catch(e) {
+    msgEl.className = 'mt-4 p-3 rounded-lg text-sm text-center bg-red-900/30 border border-red-700 text-red-400';
+    msgEl.textContent = 'خطأ في الاتصال';
   }
 }
 
