@@ -149,6 +149,27 @@ try:
 except Exception as _e:
     log.error("DB init error: %s", _e)
 
+def init_db():
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""CREATE TABLE IF NOT EXISTS users (
+                email TEXT PRIMARY KEY, credits INTEGER DEFAULT 0,
+                plan TEXT DEFAULT 'free', updated_at TEXT)""")
+            cur.execute("""CREATE TABLE IF NOT EXISTS jobs (
+                job_id TEXT PRIMARY KEY, status TEXT DEFAULT 'pending',
+                report TEXT, credits INTEGER, cost INTEGER, plan TEXT,
+                is_exempt BOOLEAN DEFAULT FALSE, error TEXT,
+                ts DOUBLE PRECISION, created_at TIMESTAMP DEFAULT NOW())""")
+            cur.execute("""CREATE TABLE IF NOT EXISTS orders (
+                order_id TEXT PRIMARY KEY,
+                email TEXT,
+                plan TEXT,
+                credits_granted INTEGER,
+                credits_after_grant INTEGER,
+                refund_status TEXT DEFAULT 'none',
+                created_at TIMESTAMP DEFAULT NOW())""")
+        conn.commit()
+
 # ─── Routes (home) ───────────────────────────────────────────────────────────
 @app.route('/')
 def home():
@@ -202,15 +223,23 @@ def add_vip_credits(email_addr):
         conn.commit()
     log.info("VIP credits added for %s", email_addr)
 
-def add_credits(email_addr, plan, amount):
+def add_credits(email_addr, plan, amount, order_id=None):
     email_addr = email_addr.strip().lower()
-    if is_exempt(email_addr): return
+    if is_exempt(email_addr):
+        return
     get_or_create_user(email_addr)
     now = datetime.now(timezone.utc).isoformat()
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("UPDATE users SET credits=credits+%s, plan=%s, updated_at=%s WHERE email=%s",
                 (amount, plan, now, email_addr))
+            cur.execute("SELECT credits FROM users WHERE email=%s", (email_addr,))
+            new_balance = cur.fetchone()["credits"]
+            if order_id:
+                cur.execute("""INSERT INTO orders (order_id, email, plan, credits_granted, credits_after_grant)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (order_id) DO NOTHING""",
+                    (order_id, email_addr, plan, amount, new_balance))
         conn.commit()
 
 # ─── Job Helpers ─────────────────────────────────────────────────────────────
@@ -709,6 +738,36 @@ def job_status(job_id):
         return jsonify({"status": "expired"}), 200
     return jsonify(dict(job)), 200
 
+@app.route("/admin/check-refund", methods=["GET"])
+def check_refund_eligibility():
+    order_id = request.args.get("order_id", "").strip()
+    admin_key = request.args.get("key", "").strip()
+    if not ADMIN_SECRET_CODE or admin_key != ADMIN_SECRET_CODE:
+        return jsonify({"error": "unauthorized"}), 403
+    if not order_id:
+        return jsonify({"error": "order_id required"}), 400
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM orders WHERE order_id = %s", (order_id,))
+            order = cur.fetchone()
+            if not order:
+                return jsonify({"error": "order not found"}), 404
+            cur.execute("SELECT credits FROM users WHERE email = %s", (order["email"],))
+            user = cur.fetchone()
+            current_credits = user["credits"] if user else 0
+
+    eligible = current_credits >= order["credits_after_grant"]
+    return jsonify({
+        "order_id": order_id,
+        "email": order["email"],
+        "plan": order["plan"],
+        "credits_granted": order["credits_granted"],
+        "credits_at_purchase_time": order["credits_after_grant"],
+        "current_credits": current_credits,
+        "refund_eligible": eligible,
+    })
+
 
 @app.route("/lemonsqueezy/webhook", methods=["POST"])
 def lemonsqueezy_webhook():
@@ -728,18 +787,19 @@ def lemonsqueezy_webhook():
             return jsonify({"error": "no email"}), 400
 
         if event_name == "order_created":
-            variant_id = None
-            for item in payload.get("included", []):
-                if item.get("type") == "order-items":
-                    variant_id = str(item.get("attributes", {}).get("variant_id", "")).strip()
-                    break
-            plan_info = PLAN_CREDITS.get(variant_id)
-            if not plan_info:
-                return jsonify({"status": "unknown_plan"}), 200
-            plan_name, credits = plan_info
-            add_credits(customer_email, plan_name, credits)
-            log.info("Granted %d credits (%s) to %s", credits, plan_name, customer_email)
-            return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
+    order_id = str(payload.get("data", {}).get("id", ""))
+    variant_id = None
+    for item in payload.get("included", []):
+        if item.get("type") == "order-items":
+            variant_id = str(item.get("attributes", {}).get("variant_id", "")).strip()
+            break
+    plan_info = PLAN_CREDITS.get(variant_id)
+    if not plan_info:
+        return jsonify({"status": "unknown_plan"}), 200
+    plan_name, credits = plan_info
+    add_credits(customer_email, plan_name, credits, order_id=order_id)
+    log.info("Granted %d credits (%s) to %s [order %s]", credits, plan_name, customer_email, order_id)
+    return jsonify({"status": "success", "plan": plan_name, "credits": credits}), 200
 
         elif event_name in ("subscription_created", "subscription_payment_success"):
             add_vip_credits(customer_email)
