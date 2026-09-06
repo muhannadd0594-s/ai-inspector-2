@@ -663,67 +663,72 @@ def credits_check():
 
 @app.route("/upload", methods=["POST"])
 def direct_upload():
-    email_addr        = request.form.get("email", "").strip().lower()
-    description       = request.form.get("description", "")
-    secret_code_input = request.form.get("secret_code", "").strip()
-    lang              = request.form.get("lang", "ar").strip().lower()  # ← اللغة
-    if lang not in ("ar", "en"):
-        lang = "ar"
-    image_files = request.files.getlist("images") or request.files.getlist("image")
+    try:
+        email_addr        = request.form.get("email", "").strip().lower()
+        description       = request.form.get("description", "")
+        secret_code_input = request.form.get("secret_code", "").strip()
+        lang              = request.form.get("lang", "ar").strip().lower()
+        if lang not in ("ar", "en"):
+            lang = "ar"
+        image_files = request.files.getlist("images") or request.files.getlist("image")
 
-    if not email_addr:
-        return jsonify({"error": "Email is required"}), 400
+        if not email_addr:
+            return jsonify({"error": "Email is required"}), 400
 
-    if is_temp_email(email_addr):
-        return jsonify({"error": "Temporary emails are not allowed. Please use your real email."}), 400
+        if is_temp_email(email_addr):
+            return jsonify({"error": "Temporary emails are not allowed. Please use your real email."}), 400
 
-    if not image_files or all(f.filename == "" for f in image_files):
-        return jsonify({"error": "No image uploaded"}), 400
+        if not image_files or all(f.filename == "" for f in image_files):
+            return jsonify({"error": "No image uploaded"}), 400
 
-    if is_exempt(email_addr):
-        if not secret_code_input:
-            return jsonify({"error": "secret_required", "message": "Enter the secret code"}), 401
-        if not ADMIN_SECRET_CODE or secret_code_input != ADMIN_SECRET_CODE:
-            log.warning("Bad secret for %s", email_addr)
-            return jsonify({"error": "invalid_secret", "message": "Invalid secret code"}), 403
+        if is_exempt(email_addr):
+            if not secret_code_input:
+                return jsonify({"error": "secret_required", "message": "Enter the secret code"}), 401
+            if not ADMIN_SECRET_CODE or secret_code_input != ADMIN_SECRET_CODE:
+                log.warning("Bad secret for %s", email_addr)
+                return jsonify({"error": "invalid_secret", "message": "Invalid secret code"}), 403
 
-    valid_files = [f for f in image_files if f.filename != ""]
-    num_images  = len(valid_files)
+        valid_files = [f for f in image_files if f.filename != ""]
+        num_images  = len(valid_files)
 
-    user      = get_or_create_user(email_addr)
-    photo_lim = PHOTO_LIMIT_MAP.get(user["plan"], 1)
+        user      = get_or_create_user(email_addr)
+        photo_lim = PHOTO_LIMIT_MAP.get(user["plan"], 1)
 
-    if num_images > photo_lim:
-        return jsonify({"error": f"Your plan allows a maximum of {photo_lim} photo(s)"}), 400
+        if num_images > photo_lim:
+            return jsonify({"error": f"Your plan allows a maximum of {photo_lim} photo(s)"}), 400
 
-    cost = num_images
+        cost = num_images
 
-    if not is_exempt(email_addr) and user["credits"] < cost:
-        return jsonify({"error": "Insufficient credits", "credits": user["credits"]}), 402
+        if not is_exempt(email_addr) and user["credits"] < cost:
+            return jsonify({"error": "Insufficient credits", "credits": user["credits"]}), 402
 
-    images_bytes = [f.read() for f in valid_files]
-    logo_bytes   = None
-    lf = request.files.get("custom_logo")
-    if lf and lf.filename:
-        logo_bytes = lf.read()
+        images_bytes = [f.read() for f in valid_files]
+        logo_bytes   = None
+        lf = request.files.get("custom_logo")
+        if lf and lf.filename:
+            logo_bytes = lf.read()
 
-    job_id = str(uuid.uuid4())
-    cleanup_old_jobs()
-    create_job(job_id)
+        job_id = str(uuid.uuid4())
+        cleanup_old_jobs()
+        create_job(job_id)
 
-    threading.Thread(
-        target=_run_analysis_job,
-        args=(job_id, email_addr, images_bytes, description, cost, logo_bytes, lang),
-        daemon=True,
-    ).start()
+        threading.Thread(
+            target=_run_analysis_job,
+            args=(job_id, email_addr, images_bytes, description, cost, logo_bytes, lang),
+            daemon=True,
+        ).start()
 
-    est = {1: 40, 2: 55, 3: 75, 4: 105}.get(num_images, 60)
-    return jsonify({
-        "status":            "processing",
-        "job_id":            job_id,
-        "estimated_seconds": est,
-        "num_images":        num_images,
-    })
+        est = {1: 40, 2: 55, 3: 75, 4: 105}.get(num_images, 60)
+        return jsonify({
+            "status":            "processing",
+            "job_id":            job_id,
+            "estimated_seconds": est,
+            "num_images":        num_images,
+        })
+
+    except Exception as e:
+        log.exception("Upload route failed")
+        return jsonify({"error": "server_error", "message": str(e)}), 500
 
 
 @app.route("/status/<job_id>", methods=["GET"])
