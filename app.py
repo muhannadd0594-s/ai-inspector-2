@@ -36,6 +36,7 @@ log = logging.getLogger("ai-inspector")
 # ─── Config ──────────────────────────────────────────────────────────────────
 OPENROUTER_API_KEY  = os.environ.get("OPENROUTER_API_KEY", "").strip()
 LEMONSQUEEZY_SECRET = os.environ.get("LEMONSQUEEZY_SECRET", "").strip()
+LEMONSQUEEZY_API_KEY = os.environ.get("LEMONSQUEEZY_API_KEY", "").strip()
 ADMIN_SECRET_CODE   = os.environ.get("ADMIN_SECRET_CODE", "").strip()
 SITE_URL            = os.environ.get("VERCEL_PROJECT_PRODUCTION_URL", "ai-inspector-tau.vercel.app") or "ai-inspector-tau.vercel.app"
 FREE_CREDITS        = 3
@@ -772,6 +773,68 @@ def check_refund_eligibility():
         "current_credits": current_credits,
         "refund_eligible": eligible,
     })
+
+@app.route("/refund", methods=["POST"])
+def request_refund():
+    data     = request.get_json(force=True) or {}
+    email    = data.get("email", "").strip().lower()
+    order_id = data.get("order_id", "").strip()
+
+    if not email or not order_id:
+        return jsonify({"error": "email and order_id required"}), 400
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM orders WHERE order_id = %s AND email = %s",
+                        (order_id, email))
+            order = cur.fetchone()
+
+    if not order:
+        return jsonify({"eligible": False,
+                        "reason": "Order not found or email mismatch"}), 404
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT credits FROM users WHERE email = %s", (email,))
+            user = cur.fetchone()
+
+    current_credits  = user["credits"] if user else 0
+    credits_at_grant = order["credits_after_grant"]
+    credits_granted  = order["credits_granted"]
+    credits_used     = credits_at_grant - current_credits
+
+    if credits_used > 0:
+        return jsonify({
+            "eligible": False,
+            "reason": f"You have used {credits_used} inspection(s) from this plan"
+        })
+
+    if not LEMONSQUEEZY_API_KEY:
+        return jsonify({"error": "Refund service unavailable"}), 500
+
+    try:
+        resp = requests.post(
+            f"https://api.lemonsqueezy.com/v1/orders/{order_id}/refund",
+            headers={
+                "Authorization": f"Bearer {LEMONSQUEEZY_API_KEY}",
+                "Accept":        "application/vnd.api+json",
+                "Content-Type":  "application/vnd.api+json",
+            },
+            timeout=30,
+        )
+        if resp.status_code in (200, 201):
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("UPDATE orders SET refund_status='refunded' WHERE order_id=%s",
+                                (order_id,))
+                conn.commit()
+            return jsonify({"eligible": True, "success": True})
+        else:
+            log.error("LemonSqueezy refund error: %s %s", resp.status_code, resp.text)
+            return jsonify({"error": "Refund failed, contact support"}), 500
+    except Exception as e:
+        log.exception("Refund error")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/lemonsqueezy/webhook", methods=["POST"])
