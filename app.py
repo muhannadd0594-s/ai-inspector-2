@@ -56,6 +56,8 @@ FALLBACK_LOGO_PNG = base64.b64decode(
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+if DATABASE_URL and "sslmode=" not in DATABASE_URL:
+    DATABASE_URL += ("&" if "?" in DATABASE_URL else "?") + "sslmode=require"
 
 EXEMPT_EMAILS = {
     "akashiiso04@gmail.com",
