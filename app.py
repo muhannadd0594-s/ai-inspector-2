@@ -11,7 +11,6 @@ import uuid
 import time
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, render_template, send_from_directory, send_file, Response
-from flask_cors import CORS
 import requests
 import psycopg2
 import psycopg2.extras
@@ -29,8 +28,6 @@ app = Flask(
     static_folder=os.path.join(_ROOT, "static"),
     static_url_path="/static",
 )
-
-CORS(app) # أضف هذا السطر هنا لتفعيل مرور البيانات
 
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024
 
@@ -137,24 +134,6 @@ def is_temp_email(email_addr: str) -> bool:
 # ─── DB Connection ────────────────────────────────────────────────────────────
 def get_conn():
     return psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
-
-def init_db():
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""CREATE TABLE IF NOT EXISTS users (
-                email TEXT PRIMARY KEY, credits INTEGER DEFAULT 0,
-                plan TEXT DEFAULT 'free', updated_at TEXT)""")
-            cur.execute("""CREATE TABLE IF NOT EXISTS jobs (
-                job_id TEXT PRIMARY KEY, status TEXT DEFAULT 'pending',
-                report TEXT, credits INTEGER, cost INTEGER, plan TEXT,
-                is_exempt BOOLEAN DEFAULT FALSE, error TEXT,
-                ts DOUBLE PRECISION, created_at TIMESTAMP DEFAULT NOW())""")
-        conn.commit()
-
-try:
-    init_db()
-except Exception as _e:
-    log.error("DB init error: %s", _e)
 
 def init_db():
     with get_conn() as conn:
