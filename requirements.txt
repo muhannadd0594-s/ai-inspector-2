@@ -3,4 +3,3 @@ requests
 Pillow
 python-dotenv
 psycopg2-binary
-flask-cors
